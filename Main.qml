@@ -55,9 +55,18 @@ Window {
     property real sweepRpm: 0
     property real smoothedRpm: rpm
     property bool blinkState: false
+    property bool wasZoomedBeforeAlert: false
 
+    property string alertFuel: "FUEL RESERVE"
+    property string alertOutsideTemp: "LOW TEMP OUTSIDE"
+    property string alertEngineTemp: "HIGH ENGINE TEMP"
+    property string alertOilPress: "LOW OIL PRESSURE"
+    
     property bool isAlertActive: false
-    property string alertMessage: "FUEL RESERVE"
+    property string alertMessage: ""
+    property string alertSubMessage: ""
+    property color alertColor: "#ffaa00"
+
 
     // ==========================================
     // ANIMACJE I LOGIKA
@@ -85,6 +94,16 @@ Window {
         }
         ScriptAction { script: sweepAnimation.start() }
     }
+// --- TIMER DLA ALERTÓW ---
+    Timer {
+        id: alertTimeout
+        interval: 10000 
+        repeat: false
+        onTriggered: {
+            isAlertActive = false
+            isZoomed = wasZoomedBeforeAlert // Przywrócenie poprzedniego stanu
+        }
+    }
 
     Item {
         focus: true
@@ -92,10 +111,40 @@ Window {
         Keys.onPressed: (event) => {
             if (event.key === Qt.Key_Tab) infoMode = (infoMode + 1) % 3
             if (event.key === Qt.Key_J) isZoomed = !isZoomed 
-
             if (event.key === Qt.Key_U) {
-                isAlertActive = !isAlertActive
-                if (isAlertActive) isZoomed = true
+                if (!isAlertActive) {
+                    wasZoomedBeforeAlert = isZoomed
+                    // 1. REZERWA
+                    alertMessage = alertFuel
+                    alertSubMessage = "LEVEL LOW"
+                    alertColor = "#ffaa00"
+                    isAlertActive = true
+                    isZoomed = true
+                    alertTimeout.restart() // Start odliczania
+                } else if (alertMessage === alertFuel) {
+                    // 2. NISKA TEMP
+                    alertMessage = alertOutsideTemp
+                    alertSubMessage = "ICE POSSIBLE"
+                    alertColor = "#ffaa00"
+                    alertTimeout.restart() // Reset licznika dla nowego błędu
+                } else if (alertMessage === alertOutsideTemp) {
+                    // 3. TEMP SILNIKA
+                    alertMessage = alertEngineTemp
+                    alertSubMessage = "PULL OVER SAFELY"
+                    alertColor = redLineColor
+                    alertTimeout.restart()
+                } else if (alertMessage === alertEngineTemp) {
+                    // 4. CIŚNIENIE OLEJU
+                    alertMessage = alertOilPress
+                    alertSubMessage = "STOP ENGINE!"
+                    alertColor = redLineColor
+                    alertTimeout.restart()
+                } else {
+                    // 5. RĘCZNE WYŁĄCZENIE
+                    isAlertActive = false
+                    isZoomed = wasZoomedBeforeAlert // PRZYWRÓĆ poprzedni stan
+                    alertTimeout.stop() // Zatrzymaj timer, jeśli wyłączasz ręcznie
+                }
             }
             
             if (isZoomed) {
@@ -246,7 +295,6 @@ Window {
         // --- ELEMENTY WSKAŹNIKA (RPM) ---
         Item {
             id: elementsLayer; anchors.fill: parent; opacity: 0; z: 1
-// --- POPRAWIONE TICKI RPM (WEKTOROWE) ---
             Item {
                 id: ticksLayer
                 anchors.fill: parent
@@ -293,27 +341,51 @@ Window {
                     }
                 }
             }
-            Item {
-                id: numbersLayer; anchors.fill: parent
-                scale: isZoomed ? 0.5 : 1.0 
-                Behavior on scale { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
-                Repeater {
-                    model: 9 
-                    Item {
-                        width: 1; height: 1; anchors.centerIn: parent
-                        rotation: -135 + (index * 10 * (270 / 80))
-                        Text {
-                            text: index; y: isZoomed ? -420 : -205; anchors.horizontalCenter: parent.horizontalCenter
-                            font.family: miniFont.name; font.pixelSize: 34; font.bold: true
-                            color: {
-                                if (displayedRpm >= 6750) return redLineColor
-                                return index >= 7 ? redLineColor : (lightTheme ? "black" : "#aaa")
-                            }
-                            Behavior on y { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
-                        }
-                    }
-                }
-            }
+Item {
+                id: numbersLayer; anchors.fill: parent
+                scale: isZoomed ? 0.5 : 1.0 
+                Behavior on scale { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
+                
+                Repeater {
+                    model: 9 
+                    Item {
+                        width: 1; height: 1; anchors.centerIn: parent
+                        rotation: -135 + (index * 10 * (270 / 80))
+                        
+                        Text {
+                            id: rpmDigit
+                            text: index; 
+                            y: isZoomed ? -420 : -205; 
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            font.family: miniFont.name; font.pixelSize: 34; font.bold: true
+                            color: {
+                                if (displayedRpm >= 6750) return redLineColor
+                                return index >= 7 ? redLineColor : (lightTheme ? "black" : "#aaa")
+                            }
+                            Behavior on y { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
+                        }
+
+                        // --- DODANY NAPIS x1000 RPM ---
+                        // Text {
+                        //     visible: index === 0 // Pokazuj tylko przy zerze
+                        //     text: "x1000"
+                        //     anchors.top: rpmDigit.bottom
+                        //     // anchors.topMargin: 0
+                        //     topPadding: 100
+                        //     bottomPadding: -100
+                        //     // anchors.horizontalCenter: rpmDigit.horizontalCenter
+                        //     font.family: miniFont.name
+                        //     font.pixelSize: 14 // Mniejszy, techniczny napis
+                        //     font.bold: true
+                        //     color: "#666" // Subtelny kolor
+                            
+                        //     // Ponieważ cały Item jest obrócony o -135 stopni, 
+                        //     // musimy "odkręcić" sam napis o 135 stopni, żeby był poziomy
+                        //     rotation: 135 
+                        // }
+                    }
+                }
+            }
             Item {
                 id: gaugeLayer; anchors.fill: parent
                 Shape {
@@ -348,51 +420,55 @@ Window {
         // Text { text: "▶"; color: accentColor; opacity: isZoomed ? 0.8 : 0; font.pixelSize: 24; anchors.right: parent.right; anchors.rightMargin: 20; anchors.verticalCenter: parent.verticalCenter; Behavior on opacity { NumberAnimation { duration: 300 } } }
 
         // --- SYSTEM POWIADOMIEŃ (CHECK CONTROL) ---
+// --- SYSTEM POWIADOMIEŃ (CHECK CONTROL) ---
         Column {
             id: alertOverlay
             anchors.centerIn: parent
             spacing: 15
             opacity: isAlertActive ? 1 : 0
             visible: opacity > 0
-            z: 100 // Najwyższa warstwa
+            z: 100 
 
             Behavior on opacity { NumberAnimation { duration: 400 } }
 
-            // Ikona ostrzegawcza (Pulsowanie)
+            // Ikona ostrzegawcza (Kolor reaguje na typ błędu)
             Text {
                 text: "⚠"
-                color: "#ffaa00" // Amber
-                font.pixelSize: 50
+                color: alertColor 
+                font.pixelSize: 60
                 anchors.horizontalCenter: parent.horizontalCenter
                 
+                // Mocniejszy efekt poświaty dla czerwonych błędów
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blur: 0.5
+                    brightness: 0.3
+                    // colorInversionEnabled: false
+                }
+
                 SequentialAnimation on opacity {
                     running: isAlertActive; loops: Animation.Infinite
-                    NumberAnimation { to: 0.3; duration: 500 }
-                    NumberAnimation { to: 1.0; duration: 500 }
+                    NumberAnimation { to: 0.2; duration: 400; easing.type: Easing.InOutQuad }
+                    NumberAnimation { to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
                 }
             }
 
-            // Tekst komunikatu
             Text {
                 text: alertMessage
                 color: lightTheme ? "black" : "white"
-                font.family: "Michroma"
-                font.pixelSize: 18
-                font.bold: true
-                font.letterSpacing: 1
+                font.family: "Michroma"; font.pixelSize: 18; font.bold: true
                 anchors.horizontalCenter: parent.horizontalCenter
             }
 
-            // Dodatkowy opis
             Text {
-                text: "CHECK SYSTEM"
-                color: "#666"
-                font.family: "Michroma"
-                font.pixelSize: 10
+                text: alertSubMessage
+                color: alertColor // Napis pomocniczy też w kolorze błędu
+                font.family: "Michroma"; font.pixelSize: 11; font.bold: true
                 anchors.horizontalCenter: parent.horizontalCenter
+                opacity: 0.8
             }
         }
-
         // --- PANEL KONTROLEK OSTRZEGAWCZYCH ---
         Row {
             id: warningLightsRow
@@ -495,28 +571,67 @@ Window {
         // ---------------------------------------------------------------------
         // TRYB 0: PERFORMANCE (Prędkość + RPM)
         // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+        // GLOBAL SPEED & RPM (Zawsze widoczne, przesuwa się przy alercie)
+        // ---------------------------------------------------------------------
         Column {
             id: globalSpeedColumn
-            opacity: isAlertActive ? 0 : 1
-            visible: opacity > 0
+            opacity: 1 // Prędkość już nigdy nie znika
+            visible: true
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: (isZoomed && centerMode !== 0) ? -95 : -10
+            
+            // LOGIKA POZYCJI: Przesuń do góry (-95), jeśli:
+            // Jesteśmy w trybie innym niż 0 LUB gdy wywali alert
+            anchors.verticalCenterOffset: (isZoomed && (centerMode !== 0 || isAlertActive)) ? -95 : -10
+            
             Behavior on anchors.verticalCenterOffset { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
-            Behavior on opacity { NumberAnimation { duration: 400 } }
-            spacing: isZoomed ? (centerMode === 0 ? -15 : -5) : 2
+            spacing: isZoomed ? ((centerMode === 0 && !isAlertActive) ? -15 : -5) : 2
 
+            // Jednostka KM/H
+            Text { 
+                text: "KM/H"
+                color: displayedRpm >= 6750 ? redLineColor : accentColor
+                font.bold: true
+                anchors.horizontalCenter: parent.horizontalCenter
+                // Zmniejsz czcionkę jednostki podczas alertu w trybie 0
+                font.pixelSize: isZoomed ? ((centerMode === 0 && !isAlertActive) ? 22 : 12) : 15
+                font.family: "Michroma"
+                topPadding: isZoomed ? ((centerMode === 0 && !isAlertActive) ? 20 : 0) : 7 
+            }
 
-            Text { text: "KM/H"; color: displayedRpm >= 6750 ? redLineColor : accentColor; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: isZoomed ? (centerMode === 0 ? 22 : 12) : 15; font.family: "Michroma"; topPadding: isZoomed ? (centerMode === 0 ? 20 : 0) : 7 }
-            Text { text: Math.floor(speed); color: lightTheme ? "black" : "white"; font.family: miniFont.name; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: isZoomed ? (centerMode === 0 ? 110 : 50) : 65; topPadding: isZoomed ? (centerMode === 0 ? 0 : 0) : -18; Behavior on font.pixelSize { NumberAnimation { duration: 450 } } }
-            Text { text: Math.floor(displayedRpm) + " RPM"; color: accentColor; font.family: miniFont.name; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: isZoomed ? 18 : 12; opacity: (isZoomed && centerMode === 0) ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: 300 } } }
+            // Cyfry Prędkości
+            Text { 
+                text: Math.floor(speed)
+                color: lightTheme ? "black" : "white"
+                font.family: miniFont.name
+                font.bold: true
+                anchors.horizontalCenter: parent.horizontalCenter
+                // LOGIKA ROZMIARU: Jeśli jest alert w trybie 0, zmniejsz czcionkę do 50, aby zmieściła się na górze
+                font.pixelSize: isZoomed ? ((centerMode === 0 && !isAlertActive) ? 110 : 50) : 65
+                topPadding: isZoomed ? 0 : -18
+                Behavior on font.pixelSize { NumberAnimation { duration: 450 } } 
+            }
+
+            // RPM pod prędkością (opcjonalne w trybie alertu)
+            Text { 
+                text: Math.floor(displayedRpm) + " RPM"
+                color: accentColor
+                font.family: miniFont.name
+                font.bold: true
+                anchors.horizontalCenter: parent.horizontalCenter
+                font.pixelSize: 18
+                // Ukryj mały napis RPM pod prędkością, gdy jest alert, żeby nie robić ścisku
+                opacity: (isZoomed && centerMode === 0 && !isAlertActive) ? 1 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 300 } } 
+            }
         }
 
         // ---------------------------------------------------------------------
         // TRYB 1: ENGINE DATA (Rozwinięte parametry silnika)
         // ---------------------------------------------------------------------
         Column {
-            opacity: (centerMode === 1 && isZoomed) ? 1 : 0
-            visible: opacity > 0
+            opacity: (!isAlertActive && centerMode === 1 && isZoomed) ? 1 : 0
             anchors.centerIn: parent
             anchors.verticalCenterOffset: 25
             Behavior on opacity { NumberAnimation { duration: 400 } }
@@ -564,8 +679,7 @@ Window {
         // TRYB 2: TRIP & FUEL (Dane podróży i paliwo)
         // ---------------------------------------------------------------------
         Column {
-            opacity: (centerMode === 2 && isZoomed) ? 1 : 0
-            visible: opacity > 0
+            opacity: (!isAlertActive && centerMode === 2 && isZoomed) ? 1 : 0
             anchors.centerIn: parent
             anchors.verticalCenterOffset: 25
             Behavior on opacity { NumberAnimation { duration: 400 } }
