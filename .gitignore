@@ -1,0 +1,9 @@
+# Ignoruj cały folder kompilacji
+build/
+build_release/
+
+# Ignoruj ukryty folder konfiguracji CMake
+.cmake/
+
+# Ignoruj Twoje lokalne ścieżki do Qt na laptopie/stacjonarce
+CMakeUserPresets.json

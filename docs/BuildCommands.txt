@@ -1,0 +1,15 @@
+--- BUILDING FILE ---
+
+cmake -B build_linux -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build_linux --parallel
+
+
+--- RUN ON ARDUINO Q ---
+
+QT_QPA_PLATFORM=eglfs ./appMiniDashboard
+
+Czujnik D: 11
+Czujnik C: 10
+Czujnik B: 01
+Czujnik A: 00

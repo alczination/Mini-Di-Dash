@@ -1,0 +1,223 @@
+    Item {
+        id: gaugeCluster
+        width: 720; height: 720
+        anchors.centerIn: parent
+
+        // Szachownica
+        Item {
+            id: checkeredFlagLayer
+            anchors.fill: parent; opacity: 0; z: 0.5
+            Rectangle { id: dashboardMask; anchors.fill: parent; radius: 360; color: "black"; visible: false }
+            Item {
+                id: checkeredPatternGrid; anchors.centerIn: parent; width: 720; height: 720
+                Grid {
+                    columns: 8; rows: 8; spacing: 0; anchors.fill: parent
+                    Repeater {
+                        model: 64
+                        Rectangle {
+                            width: checkeredPatternGrid.width / 8; height: checkeredPatternGrid.height / 8
+                            color: (index + Math.floor(index/8)) % 2 === 0 ?
+                                       (mainWindow.lightTheme ? Qt.rgba(0,0,0,0.01) : Qt.rgba(1,1,1,0.01)) : "transparent"
+                        }
+                    }
+                }
+            }
+        }
+
+        // Luk
+        Item {
+            id: elementsLayer; anchors.fill: parent; opacity: 0; z: 1
+
+            // Normalny luk
+            Canvas {
+                id: staticTicksCanvas
+                anchors.fill: parent; antialiasing: true; renderTarget: Canvas.Image
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    ctx.imageSmoothingEnabled = false
+                    ctx.mozImageSmoothingEnabled = false
+
+                    var centerX = 360; var centerY = 360; var radius = 334
+                    ctx.lineWidth = 23; ctx.lineCap = "butt"
+
+                    var startRad = 135 * Math.PI / 180
+                    var sweepRad = 270 * Math.PI / 180
+                    var endRad = startRad + sweepRad
+                    ctx.beginPath()
+                    ctx.strokeStyle = mainWindow.lightTheme ? "#cccccc" : "#555555"
+                    ctx.arc(centerX, centerY, radius, startRad, endRad, false)
+                    ctx.stroke()
+
+                    var orangeStartDeg = 135 + 227.8125
+                    var orangeSweepDeg = 42.1875
+                    var orangeStartRad = orangeStartDeg * Math.PI / 180
+                    var orangeEndRad = (orangeStartDeg + orangeSweepDeg) * Math.PI / 180
+                    ctx.beginPath()
+                    ctx.strokeStyle = "#ff6600"
+                    ctx.arc(centerX, centerY, radius, orangeStartRad, orangeEndRad, false)
+                    ctx.stroke()
+                }
+            }
+
+            // Kreski na lukach
+            Repeater {
+                model: 17
+                Item {
+                    width: 720; height: 720; anchors.centerIn: parent
+                    z: isMajorTick ? 100 : 50
+                    property int realTickIndex: index * 5
+                    rotation: -135 + (realTickIndex * (270 / 80))
+                    property bool isMajorTick: realTickIndex % 10 === 0
+                    property bool isRedline: (realTickIndex * 100) >= 6750
+                    antialiasing: true
+
+                    Rectangle {
+                        width: isMajorTick ? 9 : 5
+                        height: isMajorTick ? 26 : 18
+                        y: 15
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        radius: 1
+                        antialiasing: true
+                        color: isRedline ? mainWindow.redLineColor : (mainWindow.lightTheme ? "#000000" : "#ffffff")
+                        visible: true
+                        border.width: 1;
+                        border.color: "transparent"
+                    }
+                }
+            }
+
+            Canvas {
+                id: rpmArcCanvas
+                anchors.fill: parent; antialiasing: true
+
+                Connections {
+                    target: mainWindow
+                    function onDisplayedRpmChanged() { rpmArcCanvas.requestPaint() }
+                }
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    ctx.imageSmoothingEnabled = false
+                    ctx.mozImageSmoothingEnabled = false
+
+                    ctx.lineWidth = 23; ctx.lineCap = "butt"
+                    ctx.strokeStyle = (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive) ? mainWindow.redLineColor : mainWindow.accentColor
+                    var startAngleInDegrees = 135
+                    var startRad = startAngleInDegrees * Math.PI / 180
+                    var sweepAngleInDegrees = (mainWindow.displayedRpm / 8000) * 270
+                    var endRad = startRad + (sweepAngleInDegrees * Math.PI / 180)
+
+                    ctx.beginPath()
+                    ctx.arc(360, 360, 334, startRad, endRad, false)
+                    ctx.stroke()
+                }
+            }
+
+            Item {
+                id: rpmLabelLayer; anchors.fill: parent; z: 6
+                Text {
+                    text: "x1000\nRPM"; anchors.centerIn: parent
+                    anchors.horizontalCenterOffset: 250; anchors.verticalCenterOffset: 133
+                    horizontalAlignment: Text.AlignHCenter
+                    font.family: miniFont.name; font.pixelSize: 15; font.bold: true
+                    lineHeightMode: Text.ProportionalHeight; lineHeight: 0.8
+                    color: Qt.rgba(1, 0.2, 0.2, 0.7)
+                }
+            }
+        }
+
+        // Cyfry na obrotomierzu
+        Item {
+            id: numbersLayer;
+            anchors.fill: parent;
+            z: 5
+            scale: mainWindow.isZoomed ? 0.5 : 1.0
+            Behavior on scale {
+                NumberAnimation {
+                    duration: 450;
+                    easing.type: Easing.InOutQuad
+                }
+            }
+
+            Repeater {
+                model: 9
+                Item {
+                    width: 1;
+                    height: 1;
+                    anchors.centerIn: parent
+                    rotation: -135 + (index * 10 * (270 / 80))
+
+                    Text {
+                        id: rpmDigit;
+                        text: index;
+                        y: mainWindow.isZoomed ? -605 : -295
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        font.family: miniFont.name;
+                        font.pixelSize: 49;
+                        font.bold: true
+                        visible: !(index === 4 && mainWindow.isZoomed && topOuterWarningLights.activeLights.length > 0)
+                        renderType: Text.QtRendering
+                        smooth: false
+
+                        property bool isReached: mainWindow.displayedRpm >= (index * 1000)
+                        color: {
+                            if (mainWindow.startupSweepActive) {
+                                return isReached ? (mainWindow.lightTheme ? "#000000" : "#ffffff") : (mainWindow.lightTheme ? "#666666" : "#aaaaaa")
+                            }
+                            if (mainWindow.displayedRpm >= 6750) return mainWindow.redLineColor
+                            if (index >= 7) return isReached ? mainWindow.redLineColor : Qt.rgba(1, 0.3, 0.3, 0.8)
+
+                            return isReached ? (mainWindow.lightTheme ? "#000000" : "#ffffff") : (mainWindow.lightTheme ? "#666666" : "#aaaaaa")
+                        }
+                        scale: isReached ? 1.15 : 1.0
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on y { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
+                    }
+                }
+            }
+        }
+
+        // Igla
+        Item {
+            id: gaugeLayer; anchors.fill: parent; z: 6
+
+            Item {
+                id: rpmNeedleContainer
+                opacity: 0
+                width: 14
+                height: 346
+                x: 360 - width / 2
+                y: 360 - height
+                transformOrigin: Item.Bottom
+                rotation: -135 + (displayedRpm / 8000) * 270
+
+                // 1. Dynamiczny wygląd igły Modern
+                Rectangle {
+                    anchors.bottom: parent.bottom;
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width;
+                    height: parent.height - 36;
+                    radius: 6
+                    color: lightTheme ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(0, 0, 0, 0.2)
+                    border.color: lightTheme ? "#777777" : "#ffffff";
+                    border.width: 2
+                    visible: themeMode !== 2
+                }
+                Rectangle {
+                    anchors.bottom: parent.bottom;
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 6;
+                    height: parent.height;
+                    radius: 3
+                    visible: themeMode !== 2
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: displayedRpm >= 6750 ? redLineColor : electricBlue }
+                        GradientStop { position: 1.0; color: "#ccffff" }
+                    }
+                }
+            }
+        }
+    }

@@ -1,0 +1,17 @@
+Connector / Stecker:
+https://de.aliexpress.com/item/1005004188142201.html?spm=a2g0o.order_list.order_list_main.34.25871802BuPLSL&gatewayAdapt=glo2deu
+
+Display:
+https://de.aliexpress.com/item/1005005908700409.html?spm=a2g0o.productlist.main.6.1581HTtHHTtHQ9&algo_pvid=0b02037e-43f9-47c3-a733-cfc5dd71c405&algo_exp_id=0b02037e-43f9-47c3-a733-cfc5dd71c405-5&pdp_ext_f=%7B%22order%22%3A%222%22%2C%22eval%22%3A%221%22%2C%22fromPage%22%3A%22search%22%7D&pdp_npi=6%40dis%21EUR%21143.99%2186.39%21%21%21161.84%2197.10%21%4021038e6617755185036686024ee74e%2112000051300458294%21sea%21DE%21912713152%21X%211%210%21n_tag%3A-29919%3Bd%3A870255d7%3Bm03_new_user%3A-29895&curPageLogUid=RrysYx8r96TT&utparam-url=scene%3Asearch%7Cquery_from%3A%7Cx_object_id%3A1005005908700409%7C_p_origin_prod%3A
+
+https://de.aliexpress.com/item/1005003249756249.html?spm=a2g0o.productlist.main.5.1581HTtHHTtHQ9&algo_pvid=0b02037e-43f9-47c3-a733-cfc5dd71c405&algo_exp_id=0b02037e-43f9-47c3-a733-cfc5dd71c405-4&pdp_ext_f=%7B%22order%22%3A%229%22%2C%22eval%22%3A%221%22%2C%22fromPage%22%3A%22search%22%7D&pdp_npi=6%40dis%21EUR%2191.83%2159.69%21%21%21103.22%2167.10%21%4021038e6617755185036686024ee74e%2112000042213867504%21sea%21DE%21912713152%21X%211%210%21n_tag%3A-29919%3Bd%3A870255d7%3Bm03_new_user%3A-29895&curPageLogUid=vqkaQPO0GQgu&utparam-url=scene%3Asearch%7Cquery_from%3A%7Cx_object_id%3A1005003249756249%7C_p_origin_prod%3A
+
+https://de.aliexpress.com/item/1005001694157104.html?spm=a2g0o.productlist.main.6.182edEmVdEmVBS&algo_pvid=86730b52-7293-46ce-ae2f-3ab063d37ed9&algo_exp_id=86730b52-7293-46ce-ae2f-3ab063d37ed9-5&pdp_ext_f=%7B%22order%22%3A%2235%22%2C%22spu_best_type%22%3A%22price%22%2C%22eval%22%3A%221%22%2C%22fromPage%22%3A%22search%22%7D&pdp_npi=6%40dis%21EUR%2188.88%2163.99%21%21%2199.90%2171.92%21%40211b612517755182000774160ecf9d%2112000017171834897%21sea%21DE%21912713152%21X%211%210%21n_tag%3A-29919%3Bd%3A870255d7%3Bm03_new_user%3A-29895&curPageLogUid=Pkoprf7uwmiA&utparam-url=scene%3Asearch%7Cquery_from%3A%7Cx_object_id%3A1005001694157104%7C_p_origin_prod%3A
+
+https://de.aliexpress.com/item/1005003249756249.html?spm=a2g0o.productlist.main.7.182edEmVdEmVBS&algo_pvid=86730b52-7293-46ce-ae2f-3ab063d37ed9&algo_exp_id=86730b52-7293-46ce-ae2f-3ab063d37ed9-6&pdp_ext_f=%7B%22order%22%3A%229%22%2C%22eval%22%3A%221%22%2C%22fromPage%22%3A%22search%22%7D&pdp_npi=6%40dis%21EUR%2191.83%2159.69%21%21%21103.22%2167.10%21%40211b612517755182000774160ecf9d%2112000042213867504%21sea%21DE%21912713152%21X%211%210%21n_tag%3A-29919%3Bd%3A870255d7%3Bm03_new_user%3A-29895&curPageLogUid=A8yB1F6Sl05X&utparam-url=scene%3Asearch%7Cquery_from%3A%7Cx_object_id%3A1005003249756249%7C_p_origin_prod%3A#nav-specification
+
+Git:
+https://github.com/WaggishSaucer62/R53-CANBUS-datamanager/tree/main
+
+Reddit:
+https://www.reddit.com/r/R53/comments/126z8z8/comment/naxwdpu/?force-legacy-sct=1

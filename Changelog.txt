@@ -1,0 +1,12 @@
+Version 1.0.2
+
+- Solved issue with slow interface - Main.cpp Basic Rendering changed to GL
+- Support for CAN
+- Needle Fade
+- Buttons support
+
+Todo
+- Add support for buttons for QML
+- Make KM/H bigger
+- Make x1000RPM bigger
+- Split CAN Functions and Buttons Functions to separate .cpp and .h files
