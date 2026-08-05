@@ -49,6 +49,7 @@ Window {
         source: "assets/Michroma-Regular.ttf"
     }
 
+    /*
     Connections {
         target: canBusBackend
         function onMileageReceived(mileage) { mainWindow.totalMileage = mileage }
@@ -67,6 +68,9 @@ Window {
                 mainWindow.headlightsActive = headlights
                 mainWindow.handbrakeActive = handbrake
             }
+        }
+        function onLightsStatusReceived(enabled) {
+            headlightsActive = enabled;
         }
         function onFuelReserveChanged(active) {
             if (!mainWindow.testMode) {
@@ -88,6 +92,7 @@ Window {
             }
         }
     }
+    */
 
     property int centerMode: 0
     readonly property var modeNames: ["OSIĄGI", "SILNIK", "TRIP", "TURBO", "INSPEKCJA", "PARK", "OPONY", "USTAWIENIA"]
@@ -104,21 +109,35 @@ Window {
     property real displayedRpm: testMode ? rpm : (startupSweepActive ? sweepRpm : smoothedRpm)
     property real speed: testMode ? 0 : canBusBackend.speed
     Behavior on speed { SmoothedAnimation { velocity: 150; duration: 200 } }
-    property real totalMileage: 0
-    property real outdoorTemp: 0
+    property real totalMileage: canBusBackend.mileage
+    property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
 
     // Engine-Mode
-    property double oilTemp: canBusBackend.oilTemp
-    property double oilPress: canBusBackend.oilPress
-    property double engineTemp: canBusBackend.engineTemp
+    property double oilTemp: testMode ? 0 : canBusBackend.oilTemp
+    property double oilPress: testMode ? 0 : canBusBackend.oilPress
+    property double engineTemp: testMode ? 0 : canBusBackend.engineTemp
 
     // Trip-Mode
     property real fuelAmount: testMode ? 0 : canBusBackend.fuelAmount
     property real rangeKm: testMode ? 0 : canBusBackend.rangeKm
+    property real fuelReserveThreshold: 5.0
+    property real maxFuelCapacity: 50
 
     // Turbo-Mode
-    property real throttlePosition: 0
+    property real throttlePosition: testMode ? 0 : canBusBackend.throttle
+
+    // Service-Mode
+    property real serviceBrakesKm: 0
+    property var inspectionDate: new Date(2028, 5, 1)
+
+    function resetInspectionDate() {
+        var currentDate = new Date()
+        inspectionDate = new Date(currentDate.getFullYear() + 2, currentDate.getMonth(), 1)
+    }
+
+    // Settings-Mode
+    property string activeLogoOption: "MODERN"
 
     property bool isZoomed: false
     onIsZoomedChanged: {
@@ -128,16 +147,16 @@ Window {
     }
 
     // Blinkers
-    property bool headlightsActive: false
-    property bool leftBlinkerActive: false
-    property bool rightBlinkerActive: false
-    property bool blinkState: false
+    property bool headlightsActive: canBusBackend.headlightsActive
+    // property bool leftBlinkerActive: false
+    // property bool rightBlinkerActive: false
+    // property bool blinkState: false
 
     // Doors and Hood
-    property bool doorLeftOpen: false
-    property bool doorRightOpen: false
-    property bool hoodOpen: false
-    property bool trunkOpen: false
+    property bool doorLeftOpen: canBusBackend.doorLeft
+    property bool doorRightOpen: canBusBackend.doorRight
+    property bool hoodOpen: canBusBackend.hoodOpen
+    property bool trunkOpen: canBusBackend.trunkOpen
 
     // MISC
     property bool isBulbCheckActive: false
@@ -145,16 +164,15 @@ Window {
     property bool showFps: false
 
     // Check Controls
-    property bool _realCheckEngine: false
+    property bool _realCheckEngine: canBusBackend.checkEngine
     property bool checkEngine: _realCheckEngine || isBulbCheckActive || testMode
-    property bool _realAbsWarning: false
+    property bool _realAbsWarning: canBusBackend.absWarning
     property bool absWarning: _realAbsWarning || isBulbCheckActive || testMode
-    property bool _realTractionWarning: false
+    property bool _realTractionWarning: canBusBackend.tractionWarning
     property bool tractionWarning: _realTractionWarning || isBulbCheckActive || testMode
     property bool _realAirbagWarning: false
     property bool airbagWarning: _realAirbagWarning || isBulbCheckActive || testMode
-    property bool handbrakeActive: false
-    property bool handbrake: handbrakeActive || isBulbCheckActive || testMode
+    property bool handbrakeActive: testMode ? _testHandbrake : canBusBackend.handbrake
 
     // Startup and Zoom
     property bool startupSweepActive: true
@@ -182,6 +200,24 @@ Window {
     property string alertSubMessage: ""
     property color alertColor: "#ffaa00"
     property string alertIconSource: ""
+
+    onFuelAmountChanged: {
+        if (!testMode && canBusBackend.fuelReserve) {
+            if (!fuelAlertTriggered && !isAlertActive) {
+                fuelAlertTriggered = true
+                wasZoomedBeforeAlert = isZoomed
+                alertMessage = alertFuel
+                alertSubMessage = "NISKI POZIOM PALIWA"
+                alertColor = "#ffaa00"
+                alertIconSource = "control_lights/tank_light.png"
+                isAlertActive = true
+                isZoomed = true
+                alertTimeout.restart()
+            }
+        } else if (!canBusBackend.fuelReserve) {
+            fuelAlertTriggered = false
+        }
+    }
 
     Timer {
         id: startupBulbCheckTimer
@@ -498,7 +534,7 @@ Window {
                 }
             }
 
-            // Stripes on Arc
+            // Ticks on Arc
             Repeater {
                 model: 17
                 Item {
@@ -509,16 +545,20 @@ Window {
 
                     property bool isMajorTick: realTickIndex % 10 === 0
                     property bool isRedline: (realTickIndex * 100) >= 6750
-                    antialiasing: true
 
                     Rectangle {
                         width: isMajorTick ? 9 : 5
                         height: isMajorTick ? 50 : 22
-                        y: 15
+                        y: 17
                         anchors.horizontalCenter: parent.horizontalCenter
                         radius: 1
                         antialiasing: true
-                        color: isRedline ? mainWindow.redLineColor : (mainWindow.lightTheme ? "#000000" : "#ffffff")
+                        color: {
+                            if (isRedline) {
+                                return mainWindow.redLineColor;
+                            }
+                            return headlightsActive ? "#ffffff" : "#474747";
+                        }
                         visible: true
                         border.width: 1;
                         border.color: "transparent"
@@ -584,12 +624,13 @@ Window {
                 id: rpmLabelLayer; anchors.fill: parent; z: 6
                 Text {
                     text: "x1000\nRPM"; anchors.centerIn: parent
-                    anchors.horizontalCenterOffset: -250; anchors.verticalCenterOffset: 150
+                    anchors.horizontalCenterOffset: -250; anchors.verticalCenterOffset: 155
                     horizontalAlignment: Text.AlignHCenter
                     font.family: miniFont.name;
                     font.pixelSize: mainWindow.isZoomed ? 17 : 22;
                     font.bold: true
-                    lineHeightMode: Text.ProportionalHeight; lineHeight: 0.8
+                    lineHeightMode: Text.ProportionalHeight;
+                    lineHeight: 0.8
                     color: Qt.rgba(1, 0.2, 0.2, 0.7)
                 }
             }
@@ -613,10 +654,10 @@ Window {
                     Text {
                         id: rpmDigit;
                         text: index;
-                        y: mainWindow.isZoomed ? -595 : -295
+                        y: mainWindow.isZoomed ? -573 : -295
                         anchors.horizontalCenter: parent.horizontalCenter
                         font.family: miniFont.name;
-                        font.pixelSize: mainWindow.isZoomed ? 55 : 45;
+                        font.pixelSize: mainWindow.isZoomed ? 55 : 47;
                         font.bold: true
                         visible: !(index === 4 && mainWindow.isZoomed && topOuterWarningLights.activeLights.length > 0)
                         renderType: Text.QtRendering
@@ -773,7 +814,7 @@ Window {
             property real centerAngle: -90
             property real angleSpacing: mainWindow.isZoomed ? 12 : 30
             property var lightsModel: [
-                { src: "control_lights/highbeam_light.png",  color: "#0066ff",  active: mainWindow.highlightsActive || mainWindow.isBulbCheckActive || mainWindow.testMode, isFullWidth: true },
+                { src: "control_lights/highbeam_light.png",  color: "#0066ff",  active: mainWindow.headlightsActive || mainWindow.isBulbCheckActive || mainWindow.testMode, isFullWidth: true },
                 { src: "control_lights/handbrake_light.png", color: mainWindow.redLineColor, active: mainWindow.handbrake, isFullWidth: false },
                 { src: "control_lights/dooropen_light.png",  color: mainWindow.redLineColor, active: mainWindow.doorLeftOpen || mainWindow.doorRightOpen || mainWindow.isBulbCheckActive, isFullWidth: false },
                 { src: "control_lights/hoodopen_light.png",   color: "#ffaa00",  active: mainWindow.hoodOpen || mainWindow.isBulbCheckActive, isFullWidth: false },
@@ -902,17 +943,34 @@ Window {
 
                 Image {
                     id: miniLogo
-                    source: "assets/mini_logo.png"
-                    width: 315
+                    readonly property var logoMap: ({
+                                                        "MINI"  	:   "assets/mini_logo.png",
+                                                        "COOPER S"  :   "assets/mini_slogo.png",
+                                                        "MODERN"    :   "assets/minimodern_logo.png",
+                                                        "BRAK"      :   ""
+                                                    })
+                    readonly property var widthMap: ({
+                                                        "MINI"      :   310,
+                                                        "COOPER S"  :   105,
+                                                        "MODERN"    :   240,
+                                                        "BRAK"      :   0
+                                                    })
+                    source: logoMap[mainWindow.activeLogoOption] || ""
+                    width: widthMap[mainWindow.activeLogoOption] || 200
                     fillMode: Image.PreserveAspectFit
-                    antialiasing: false
-                    visible: !mainWindow.isZoomed
-                    opacity: visible ? 1.0 : 0.0
+                    antialiasing: true
+                    readonly property bool shouldBeVisible: source !== "" && !mainWindow.isZoomed
+                    opacity: shouldBeVisible ? 1.0 : 0.0
+                    visible: opacity > 0
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    Behavior on opacity { NumberAnimation { duration: 250 } }
+                    anchors.verticalCenterOffset: -135
+                    Behavior on opacity {
+                        NumberAnimation { duration: 250 }
+                    }
                 }
             }
+
 
             // Fuel Arc
             Shape {
@@ -1124,10 +1182,18 @@ Window {
                     font.bold: true;
                     anchors.horizontalCenter: parent.horizontalCenter;
                     font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 150 : 72) : 140;
-                    topPadding: mainWindow.isZoomed ? -40 : -10;
+                    topPadding: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 30 : -30) : -10;
+
                     Behavior on font.pixelSize {
                         NumberAnimation {
                             duration: 450
+                        }
+                    }
+
+                    Behavior on topPadding {
+                        NumberAnimation {
+                            duration: 450
+                            easing.type: Easing.InOutQuad
                         }
                     }
                 }
@@ -1235,6 +1301,13 @@ Window {
                     if (mainWindow.hasOwnProperty("rangeKm")) mainWindow.rangeKm = 0
                     nestedMenuContainer.exitSubMenu()
                 }
+                onLogoChanged: (newLogo) => {
+                                   mainWindow.activeLogoOption = newLogo
+                               }
+                onInspectionReset: {
+                    mainWindow.resetInspectionDate()
+                    nestedMenuContainer.exitSubMenu()
+                }
 
                 opacity: (!mainWindow.isAlertActive && mainWindow.centerMode === 7 && mainWindow.isZoomed) ? 1 : 0
                 visible: opacity > 0
@@ -1266,7 +1339,7 @@ Window {
             electricBlue: mainWindow.electricBlue
             fontName: miniFont.name
             z: 11
-            y: mainWindow.isZoomed ? 626 : 547
+            y: mainWindow.isZoomed ? 626 : 545
             anchors.horizontalCenter: parent.horizontalCenter
         }
 

@@ -92,6 +92,7 @@ signals:
     void doorLeftStatusReceived(bool open);
     void doorRightStatusReceived(bool open);
     void hoodStatusReceived(bool open);
+    void lightsStatusReceived(bool enabled);
     void trunkStatusReceived(bool open);
     void absWarningReceived(bool active);
     void tractionWarningReceived(bool active);
@@ -262,6 +263,7 @@ private:
 
                 emit handbrakeReceived((byte4 & 0x02) != 0);
                 emit hoodStatusReceived((byte1 & 0x08) != 0);
+                emit lightsStatusReceived((byte1 & 0x04) != 0);
 
                 double outdoor_temp = static_cast<double>(byte3 & 0x7F);
                 if ((byte3 & 0x80) != 0) {
@@ -307,12 +309,31 @@ class CanBusBackend : public QObject
     Q_PROPERTY(double fuelAmount READ fuelAmount NOTIFY fuelAmountChanged)
     Q_PROPERTY(int rangeKm READ rangeKm NOTIFY rangeKmChanged)
     Q_PROPERTY(double turbo READ turbo NOTIFY turboChanged)
+    Q_PROPERTY(int mileage READ mileage NOTIFY mileageChanged)
+    Q_PROPERTY(bool fuelReserve READ fuelReserve NOTIFY fuelReserveChanged)
+    Q_PROPERTY(double avgConsumption READ avgConsumption NOTIFY avgConsumptionChanged)
+    Q_PROPERTY(double throttle READ throttle NOTIFY throttleChanged)
+    Q_PROPERTY(double outdoorTemp READ outdoorTemp NOTIFY outdoorTempChanged)
+    Q_PROPERTY(bool doorLeft READ doorLeft NOTIFY doorLeftStatusChanged)
+    Q_PROPERTY(bool doorRight READ doorRight NOTIFY doorRightStatusChanged)
+    Q_PROPERTY(bool hoodOpen READ hoodOpen NOTIFY hoodStatusChanged)
+    Q_PROPERTY(bool headlightsActive READ headlightsActive NOTIFY lightsStatusChanged)
+    Q_PROPERTY(bool trunkOpen READ trunkOpen NOTIFY trunkStatusChanged)
+    Q_PROPERTY(bool absWarning READ absWarning NOTIFY absWarningChanged)
+    Q_PROPERTY(bool tractionWarning READ tractionWarning NOTIFY tractionWarningChanged)
+    Q_PROPERTY(bool handbrake READ handbrake NOTIFY handbrakeChanged)
+    Q_PROPERTY(bool checkEngine READ checkEngine NOTIFY checkEngineChanged)
 
 public:
     explicit CanBusBackend(QObject *parent = nullptr)
         : QObject(parent),
         m_rpm(0), m_speed(0), m_oilTemp(0.0), m_oilPress(0.0),
-        m_engineTemp(0.0), m_fuelAmount(0.0), m_rangeKm(0), m_turbo(0.0)
+        m_engineTemp(0.0), m_fuelAmount(0.0), m_rangeKm(0), m_turbo(0.0),
+        m_mileage(0), m_fuelReserve(false), m_avgConsumption(0.0),
+        m_throttle(0.0), m_outdoorTemp(0.0), m_doorLeft(false),
+        m_doorRight(false), m_hoodOpen(false), m_headlightsActive(false),
+        m_trunkOpen(false), m_absWarning(false), m_tractionWarning(false),
+        m_handbrake(false), m_checkEngine(false)
     {
         m_worker = new CanWorker();
         m_worker->moveToThread(&m_workerThread);
@@ -328,20 +349,22 @@ public:
         connect(m_worker, &CanWorker::fuelReceived, this, &CanBusBackend::setFuelAmount);
         connect(m_worker, &CanWorker::rangeKmReceived, this, &CanBusBackend::setRangeKm);
         connect(m_worker, &CanWorker::turboReceived, this, &CanBusBackend::setTurbo);
+        connect(m_worker, &CanWorker::mileageReceived, this, &CanBusBackend::setMileage);
+        connect(m_worker, &CanWorker::fuelReserveChanged, this, &CanBusBackend::setFuelReserve);
+        connect(m_worker, &CanWorker::avgConsumptionReceived, this, &CanBusBackend::setAvgConsumption);
+        connect(m_worker, &CanWorker::throttleReceived, this, &CanBusBackend::setThrottle);
+        connect(m_worker, &CanWorker::tempReceived, this, &CanBusBackend::setOutdoorTemp);
+        connect(m_worker, &CanWorker::doorLeftStatusReceived, this, &CanBusBackend::setDoorLeft);
+        connect(m_worker, &CanWorker::doorRightStatusReceived, this, &CanBusBackend::setDoorRight);
+        connect(m_worker, &CanWorker::hoodStatusReceived, this, &CanBusBackend::setHoodOpen);
+        connect(m_worker, &CanWorker::lightsStatusReceived, this, &CanBusBackend::setHeadlightsActive);
+        connect(m_worker, &CanWorker::trunkStatusReceived, this, &CanBusBackend::setTrunkOpen);
+        connect(m_worker, &CanWorker::absWarningReceived, this, &CanBusBackend::setAbsWarning);
+        connect(m_worker, &CanWorker::tractionWarningReceived, this, &CanBusBackend::setTractionWarning);
+        connect(m_worker, &CanWorker::handbrakeReceived, this, &CanBusBackend::setHandbrake);
+        connect(m_worker, &CanWorker::engineMilStatusReceived, this, &CanBusBackend::setCheckEngine);
+
         connect(m_worker, &CanWorker::wheelSpeedsReceived, this, &CanBusBackend::wheelSpeedsReceived);
-        connect(m_worker, &CanWorker::mileageReceived, this, &CanBusBackend::mileageReceived);
-        connect(m_worker, &CanWorker::fuelReserveChanged, this, &CanBusBackend::fuelReserveChanged);
-        connect(m_worker, &CanWorker::avgConsumptionReceived, this, &CanBusBackend::avgConsumptionReceived);
-        connect(m_worker, &CanWorker::throttleReceived, this, &CanBusBackend::throttleReceived);
-        connect(m_worker, &CanWorker::tempReceived, this, &CanBusBackend::tempReceived);
-        connect(m_worker, &CanWorker::doorLeftStatusReceived, this, &CanBusBackend::doorLeftStatusReceived);
-        connect(m_worker, &CanWorker::doorRightStatusReceived, this, &CanBusBackend::doorRightStatusReceived);
-        connect(m_worker, &CanWorker::hoodStatusReceived, this, &CanBusBackend::hoodStatusReceived);
-        connect(m_worker, &CanWorker::trunkStatusReceived, this, &CanBusBackend::trunkStatusReceived);
-        connect(m_worker, &CanWorker::absWarningReceived, this, &CanBusBackend::absWarningReceived);
-        connect(m_worker, &CanWorker::tractionWarningReceived, this, &CanBusBackend::tractionWarningReceived);
-        connect(m_worker, &CanWorker::handbrakeReceived, this, &CanBusBackend::handbrakeReceived);
-        connect(m_worker, &CanWorker::engineMilStatusReceived, this, &CanBusBackend::engineMilStatusReceived);
         connect(m_worker, &CanWorker::clusterLightsReceived, this, &CanBusBackend::clusterLightsReceived);
 
         m_workerThread.start();
@@ -364,6 +387,20 @@ public:
     double fuelAmount() const { return m_fuelAmount; }
     int rangeKm() const { return m_rangeKm; }
     double turbo() const { return m_turbo; }
+    int mileage() const { return m_mileage; }
+    bool fuelReserve() const { return m_fuelReserve; }
+    double avgConsumption() const { return m_avgConsumption; }
+    double throttle() const { return m_throttle; }
+    double outdoorTemp() const { return m_outdoorTemp; }
+    bool doorLeft() const { return m_doorLeft; }
+    bool doorRight() const { return m_doorRight; }
+    bool hoodOpen() const { return m_hoodOpen; }
+    bool headlightsActive() const { return m_headlightsActive; }
+    bool trunkOpen() const { return m_trunkOpen; }
+    bool absWarning() const { return m_absWarning; }
+    bool tractionWarning() const { return m_tractionWarning; }
+    bool handbrake() const { return m_handbrake; }
+    bool checkEngine() const { return m_checkEngine; }
 
 public slots:
     void setRpm(int r) { if (m_rpm != r) { m_rpm = r; emit rpmChanged(); } }
@@ -374,6 +411,20 @@ public slots:
     void setFuelAmount(double f) { if (m_fuelAmount != f) { m_fuelAmount = f; emit fuelAmountChanged(); } }
     void setRangeKm(int r) { if (m_rangeKm != r) { m_rangeKm = r; emit rangeKmChanged(); } }
     void setTurbo(double tb) { if (m_turbo != tb) { m_turbo = tb; emit turboChanged(); } }
+    void setMileage(int m) { if (m_mileage != m) { m_mileage = m; emit mileageChanged(); } }
+    void setFuelReserve(bool fr) { if (m_fuelReserve != fr) { m_fuelReserve = fr; emit fuelReserveChanged(); } }
+    void setAvgConsumption(double ac) { if (m_avgConsumption != ac) { m_avgConsumption = ac; emit avgConsumptionChanged(); } }
+    void setThrottle(double th) { if (m_throttle != th) { m_throttle = th; emit throttleChanged(); } }
+    void setOutdoorTemp(double ot) { if (m_outdoorTemp != ot) { m_outdoorTemp = ot; emit outdoorTempChanged(); } }
+    void setDoorLeft(bool dl) { if (m_doorLeft != dl) { m_doorLeft = dl; emit doorLeftStatusChanged(); } }
+    void setDoorRight(bool dr) { if (m_doorRight != dr) { m_doorRight = dr; emit doorRightStatusChanged(); } }
+    void setHoodOpen(bool ho) { if (m_hoodOpen != ho) { m_hoodOpen = ho; emit hoodStatusChanged(); } }
+    void setHeadlightsActive(bool ha) { if (m_headlightsActive != ha) { m_headlightsActive = ha; emit lightsStatusChanged(); } }
+    void setTrunkOpen(bool to) { if (m_trunkOpen != to) { m_trunkOpen = to; emit trunkStatusChanged(); } }
+    void setAbsWarning(bool aw) { if (m_absWarning != aw) { m_absWarning = aw; emit absWarningChanged(); } }
+    void setTractionWarning(bool tw) { if (m_tractionWarning != tw) { m_tractionWarning = tw; emit tractionWarningChanged(); } }
+    void setHandbrake(bool hb) { if (m_handbrake != hb) { m_handbrake = hb; emit handbrakeChanged(); } }
+    void setCheckEngine(bool ce) { if (m_checkEngine != ce) { m_checkEngine = ce; emit checkEngineChanged(); } }
 
 signals:
     void rpmChanged();
@@ -384,35 +435,50 @@ signals:
     void fuelAmountChanged();
     void rangeKmChanged();
     void turboChanged();
+    void mileageChanged();
+    void fuelReserveChanged();
+    void avgConsumptionChanged();
+    void throttleChanged();
+    void outdoorTempChanged();
+    void doorLeftStatusChanged();
+    void doorRightStatusChanged();
+    void hoodStatusChanged();
+    void lightsStatusChanged();
+    void trunkStatusChanged();
+    void absWarningChanged();
+    void tractionWarningChanged();
+    void handbrakeChanged();
+    void checkEngineChanged();
 
     void wheelSpeedsReceived(double lf, double rf, double lr, double rr);
-    void mileageReceived(int value);
-    void fuelReserveChanged(bool active);
-    void avgConsumptionReceived(double value);
-    void throttleReceived(double value);
-    void tempReceived(double value);
-    void doorLeftStatusReceived(bool open);
-    void doorRightStatusReceived(bool open);
-    void hoodStatusReceived(bool open);
-    void trunkStatusReceived(bool open);
-    void absWarningReceived(bool active);
-    void tractionWarningReceived(bool active);
-    void handbrakeReceived(bool active);
-    void engineMilStatusReceived(bool active);
     void clusterLightsReceived(bool leftBlinker, bool rightBlinker, bool highBeam, bool handbrake);
 
 private:
     QThread m_workerThread;
     CanWorker *m_worker;
 
-    int m_rpm;
-    int m_speed;
+    int m_rpm = 0;
+    int m_speed = 0;
     double m_oilTemp;
     double m_oilPress;
     double m_engineTemp;
     double m_fuelAmount;
     int m_rangeKm;
     double m_turbo;
+    int m_mileage;
+    bool m_fuelReserve;
+    double m_avgConsumption;
+    double m_throttle;
+    double m_outdoorTemp;
+    bool m_doorLeft;
+    bool m_doorRight;
+    bool m_hoodOpen;
+    bool m_headlightsActive;
+    bool m_trunkOpen;
+    bool m_absWarning;
+    bool m_tractionWarning;
+    bool m_handbrake;
+    bool m_checkEngine;
 };
 
 #endif // CANBUSBACKEND_H

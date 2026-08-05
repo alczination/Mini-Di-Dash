@@ -35,6 +35,8 @@ qt_add_qml_module(appMiniDashboard
     RESOURCES
         assets/Michroma-Regular.ttf
         assets/mini_logo.png
+        assets/minimodern_logo.png
+        assets/mini_slogo.png
         assets/model_electricblue.png
         control_lights/tank_light.png
         control_lights/avg_consumption.png

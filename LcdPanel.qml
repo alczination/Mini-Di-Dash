@@ -4,7 +4,7 @@ import QtQuick.Effects
 Item {
     id: lcdRoot
     width: 270
-    height: isZoomed ? 50 : 110
+    height: isZoomed ? 50 : 115
 
     property bool isZoomed: false
     property bool lightTheme: false

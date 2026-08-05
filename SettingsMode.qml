@@ -20,7 +20,7 @@ ListView {
     property string currentTheme: lightTheme ? "JASNY" : "CIEMNY"
     property bool rpmType : true
     property bool gaugeSweepActive: true
-    readonly property var logoOptions: ["MINI", "COOPER S", "JCW", "BRAK"]
+    readonly property var logoOptions: ["MINI", "COOPER S", "MODERN", "BRAK"]
     property int currentLogoIndex: 0
 
     property bool parkingAssistant: false
@@ -35,6 +35,8 @@ ListView {
     signal fpsToggled()
     signal turboCalibrated()
     signal tripReset()
+    signal logoChanged(string newLogo)
+    signal inspectionReset()
 
     model: mainCategoriesModel
     clip: true
@@ -46,37 +48,6 @@ ListView {
 
     function moveDown() {
         currentIndex = (currentIndex + 1) % maxItemsCount;
-    }
-
-    function triggerAction() {
-        if (currentSubMenu === "") {
-            var currentCategory = mainCategoriesModel.get(currentIndex);
-            if (currentCategory && currentCategory.sub) {
-                enterSubMenu(currentCategory.sub);
-            }
-        } else {
-            var currentItem = filteredOptionsModel.get(currentIndex);
-            if (currentItem) {
-                if (currentItem.type === "back" || currentItem.idNum === -1) {
-                    exitSubMenu();
-                } else {
-                    switch(currentItem.idNum) {
-                    case 3: themeChanged(); break;
-                    case 5: rpmType = !rpmType; break;
-                    case 6: gaugeSweepActive = !gaugeSweepActive; break;
-                    case 7: settingsModeRoot.currentLogoIndex = (settingsModeRoot.currentLogoIndex + 1) % settingsModeRoot.logoOptions.length; break;
-                    case 10: parkingAssistant = !parkingAssistant; break;
-                    case 11: turboBoostSensorActive = !turboBoostSensorActive; break;
-                    case 12: oilPressureSensorActive = !oilPressureSensorActive; break;
-                    case 13: tpmsSensorActive = !tpmsSensorActive; break;
-                    case 14: perfShiftActive = !perfShiftActive; break;
-                    case 18: tripReset(); break;
-                    case 23: showFps = !showFps; fpsToggled(); break;
-                    case 25: currentCanFreq = (currentCanFreq === "50Hz") ? "100Hz" : "50Hz"; break;
-                    }
-                }
-            }
-        }
     }
 
     function enterSubMenu(catName) {
@@ -153,6 +124,41 @@ ListView {
         ListElement { name: "RESTART"; category: "SYSTEM"; type: "action"; idNum: 26 }
     }
     ListModel { id: filteredOptionsModel }
+
+    function triggerAction() {
+        if (currentSubMenu === "") {
+            var currentCategory = mainCategoriesModel.get(currentIndex);
+            if (currentCategory && currentCategory.sub) {
+                enterSubMenu(currentCategory.sub);
+            }
+        } else {
+            var currentItem = filteredOptionsModel.get(currentIndex);
+            if (currentItem) {
+                if (currentItem.type === "back" || currentItem.idNum === -1) {
+                    exitSubMenu();
+                } else {
+                    switch(currentItem.idNum) {
+                    case 3: themeChanged(); break;
+                    case 5: rpmType = !rpmType; break;
+                    case 6: gaugeSweepActive = !gaugeSweepActive; break;
+                    case 7:
+                        currentLogoIndex = (currentLogoIndex + 1) % logoOptions.length;
+                        logoChanged(logoOptions[currentLogoIndex]);
+                        break;
+                    case 10: parkingAssistant = !parkingAssistant; break;
+                    case 11: turboBoostSensorActive = !turboBoostSensorActive; break;
+                    case 12: oilPressureSensorActive = !oilPressureSensorActive; break;
+                    case 13: tpmsSensorActive = !tpmsSensorActive; break;
+                    case 14: perfShiftActive = !perfShiftActive; break;
+                    case 18: tripReset(); break;
+                    case 21: inspectionReset(); break;
+                    case 23: showFps = !showFps; fpsToggled(); break;
+                    case 25: currentCanFreq = (currentCanFreq === "50Hz") ? "100Hz" : "50Hz"; break;
+                    }
+                }
+            }
+        }
+    }
 
     delegate: Rectangle {
         id: itemRow

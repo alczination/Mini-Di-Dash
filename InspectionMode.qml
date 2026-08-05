@@ -6,7 +6,7 @@ Column {
 
     property real serviceOilKm: -12000
     property real serviceBrakesKm: 1200
-    property string inspectionDate: "06 / 2028"
+    property var inspectionDate: new Date(2026, 5, 1)
 
     property bool lightTheme: false
     property color accentColor: "#00ccff"
@@ -67,7 +67,8 @@ Column {
             font.bold: true;
             anchors.horizontalCenter: parent.horizontalCenter
         } Text {
-            text: inspectionModeRoot.inspectionDate;
+            text: Qt.formatDate(inspectionModeRoot.inspectionDate, "MM/yyyy")
+            // text: inspectionModeRoot.inspectionDate;
             color: inspectionModeRoot.lightTheme ? "black" : "white";
             font.family: "Michroma";
             font.pixelSize: 30;
