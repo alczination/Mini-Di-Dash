@@ -63,7 +63,7 @@ public slots:
 
         struct timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 200000; // 200ms timeout na odczyt z gniazda (daje czas dla pętli zdarzeń)
+        tv.tv_usec = 200000; // 200ms timeout
         setsockopt(socketCAN, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
 
         struct can_frame frame;
@@ -73,7 +73,7 @@ public slots:
                 parseFrame(frame);
             }
 
-            // KLUCZOWE: Pozwól pętli zdarzeń Qt wykonać zdarzenia QTimer w tym wątku
+            // Pozwól pętli zdarzeń Qt wykonać zdarzenia QTimer w tym wątku
             QCoreApplication::processEvents();
         }
 
@@ -92,11 +92,12 @@ public slots:
 
 private slots:
     void onCanTimeout() {
-        qWarning() << "No CAN Frames for 15 sec. Going sleep mode";
-        m_running = false;
-        QProcess::execute("vcgencmd display_power 0");
-        QProcess::execute("sudo /bin/systemctl poweroff");
-    }
+        if (!m_isSleeping) {
+            m_isSleeping = true;
+            qWarning() << "[STANDBY] Brak ramek CAN przez 15 sek. Gaszenie ekranu...";
+            QProcess::execute("vcgencmd display_power 0");
+        }
+    } // <- Tutaj brakowało klamry zamykającej metodę!
 
 signals:
     void speedReceived(int value);
@@ -128,6 +129,7 @@ signals:
 private:
     std::atomic<bool> m_running;
     QTimer *m_watchdogTimer = nullptr;
+    bool m_isSleeping = false;
     bool m_firstClickRecorded = false;
     uint16_t m_lastFuelClick = 0;
     double m_currentLitersPerHundred = 0.0;
@@ -136,8 +138,18 @@ private:
 
 #ifdef Q_OS_LINUX
     void parseFrame(const struct can_frame &frame) {
-        // RESETUJEMY WATCHDOG TYLKO DLA KLUCZOWYCH RAMEK SILNIKA (RPM / Prędkość)
+        // RESETUJEMY WATCHDOG TYLKO DLA RAMEK SILNIKA (RPM / Prędkość)
         if (frame.can_id == 0x316 || frame.can_id == 0x153) {
+
+            // Jeśli system był w trybie Soft Standby - wybudzamy ekran!
+            if (m_isSleeping) {
+                m_isSleeping = false;
+                qWarning() << "[STANDBY] Wykryto ruch na CAN! Wybudzanie ekranu...";
+
+                // 1. Włącz ekran z powrotem
+                QProcess::execute("vcgencmd display_power 1");
+            }
+
             if (m_watchdogTimer) {
                 m_watchdogTimer->start(15000);
             }
