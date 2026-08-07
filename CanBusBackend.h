@@ -5,7 +5,6 @@
 #include <QThread>
 #include <QDebug>
 #include <QTimer>
-#include <QProcess>
 #include <QCoreApplication>
 #include <atomic>
 
@@ -32,10 +31,9 @@ public slots:
     void startWorker() {
         m_running = true;
 
-        // Inicjalizacja Watchdoga wewnątrz wątku pracownika
         m_watchdogTimer = new QTimer(this);
         connect(m_watchdogTimer, &QTimer::timeout, this, &CanWorker::onCanTimeout);
-        m_watchdogTimer->start(15000); // 15 sekund braku ramek = uśpienie
+        m_watchdogTimer->start(15000); // 15 sekund braku ramek = standby
 
 #ifdef Q_OS_LINUX
         int socketCAN = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -73,7 +71,6 @@ public slots:
                 parseFrame(frame);
             }
 
-            // Pozwól pętli zdarzeń Qt wykonać zdarzenia QTimer w tym wątku
             QCoreApplication::processEvents();
         }
 
@@ -94,12 +91,13 @@ private slots:
     void onCanTimeout() {
         if (!m_isSleeping) {
             m_isSleeping = true;
-            qWarning() << "[STANDBY] Brak ramek CAN przez 15 sek. Gaszenie ekranu...";
-            QProcess::execute("vcgencmd display_power 0");
+            qWarning() << "[STANDBY] Brak ramek CAN przez 15 sek. Przejście w tryb czarnego ekranu...";
+            emit sleepStateChanged(true);
         }
-    } // <- Tutaj brakowało klamry zamykającej metodę!
+    }
 
 signals:
+    void sleepStateChanged(bool sleeping);
     void speedReceived(int value);
     void wheelSpeedsReceived(double lf, double rf, double lr, double rr);
     void rpmReceived(int value);
@@ -141,13 +139,10 @@ private:
         // RESETUJEMY WATCHDOG TYLKO DLA RAMEK SILNIKA (RPM / Prędkość)
         if (frame.can_id == 0x316 || frame.can_id == 0x153) {
 
-            // Jeśli system był w trybie Soft Standby - wybudzamy ekran!
             if (m_isSleeping) {
                 m_isSleeping = false;
                 qWarning() << "[STANDBY] Wykryto ruch na CAN! Wybudzanie ekranu...";
-
-                // 1. Włącz ekran z powrotem
-                QProcess::execute("vcgencmd display_power 1");
+                emit sleepStateChanged(false);
             }
 
             if (m_watchdogTimer) {
@@ -401,6 +396,7 @@ private:
 class CanBusBackend : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool isSleeping READ isSleeping NOTIFY isSleepingChanged)
     Q_PROPERTY(int rpm READ rpm NOTIFY rpmChanged)
     Q_PROPERTY(int speed READ speed NOTIFY speedChanged)
     Q_PROPERTY(double oilTemp READ oilTemp NOTIFY oilTempChanged)
@@ -428,6 +424,7 @@ class CanBusBackend : public QObject
 public:
     explicit CanBusBackend(QObject *parent = nullptr)
         : QObject(parent),
+        m_isSleeping(false),
         m_rpm(0), m_speed(0), m_oilTemp(0.0), m_oilPress(0.0),
         m_engineTemp(0.0), m_fuelAmount(0.0), m_rangeKm(0), m_turbo(0.0),
         m_mileage(0), m_fuelReserve(false), m_avgConsumption(0.0), m_instantConsumption(0.0),
@@ -442,6 +439,7 @@ public:
         connect(&m_workerThread, &QThread::started, m_worker, &CanWorker::startWorker);
         connect(&m_workerThread, &QThread::finished, m_worker, &QObject::deleteLater);
 
+        connect(m_worker, &CanWorker::sleepStateChanged, this, &CanBusBackend::setIsSleeping);
         connect(m_worker, &CanWorker::rpmReceived, this, &CanBusBackend::setRpm);
         connect(m_worker, &CanWorker::speedReceived, this, &CanBusBackend::setSpeed);
         connect(m_worker, &CanWorker::oilTempReceived, this, &CanBusBackend::setOilTemp);
@@ -481,6 +479,7 @@ public:
     }
 
     // Getters QML
+    bool isSleeping() const { return m_isSleeping; }
     int rpm() const { return m_rpm; }
     int speed() const { return m_speed; }
     double oilTemp() const { return m_oilTemp; }
@@ -506,6 +505,7 @@ public:
     bool checkEngine() const { return m_checkEngine; }
 
 public slots:
+    void setIsSleeping(bool s) { if (m_isSleeping != s) { m_isSleeping = s; emit isSleepingChanged(); } }
     void setRpm(int r) { if (m_rpm != r) { m_rpm = r; emit rpmChanged(); } }
     void setSpeed(int s) { if (m_speed != s) { m_speed = s; emit speedChanged(); } }
     void setOilTemp(double t) { if (m_oilTemp != t) { m_oilTemp = t; emit oilTempChanged(); } }
@@ -531,6 +531,7 @@ public slots:
     void setCheckEngine(bool ce) { if (m_checkEngine != ce) { m_checkEngine = ce; emit checkEngineChanged(); } }
 
 signals:
+    void isSleepingChanged();
     void rpmChanged();
     void speedChanged();
     void oilTempChanged();
@@ -562,6 +563,7 @@ private:
     QThread m_workerThread;
     CanWorker *m_worker;
 
+    bool m_isSleeping = false;
     int m_rpm = 0;
     int m_speed = 0;
     double m_oilTemp = 0.0;
