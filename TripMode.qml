@@ -9,8 +9,9 @@ Grid {
 
     property real fuelAmount: 0
     property real maxFuelCapacity: 50.0
-    property real fuelReserveThreshold: 8.0
+    property real fuelReserveThreshold: 6.0
     property real rangeKm: 0
+    property real avgConsumption: canBusBackend.avgConsumption
 
     property bool lightTheme: false
     property color accentColor: "#00ccff"
@@ -39,7 +40,7 @@ Grid {
                 font.bold: true
             }
             Text {
-                text: (tripModeRoot.rangeKm > 0) ? ((tripModeRoot.fuelAmount / tripModeRoot.rangeKm) * 100).toFixed(1) + " L/100km" : "0.0 L/100km";
+                text: tripModeRoot.avgConsumption.toFixed(1) + " L/100km"
                 color: tripModeRoot.lightTheme ? "black" : "white";
                 font.family: "Michroma";
                 font.pixelSize: 30;
@@ -66,8 +67,8 @@ Grid {
                 font.bold: true
             }
             Text {
-                text: tripModeRoot.rangeKm + " KM";
-                color: "#888";
+                text: (tripModeRoot.rangeKm < 0 ? "---" : tripModeRoot.rangeKm) + " KM"
+                color: tripModeRoot.fuelAmount <= tripModeRoot.fuelReserveThreshold ? tripModeRoot.redLineColor : (tripModeRoot.lightTheme ? "black" : "white")
                 font.family: "Michroma";
                 font.pixelSize: 30;
                 font.bold: true

@@ -4,9 +4,11 @@
 #include <QObject>
 #include <QThread>
 #include <QDebug>
+#include <QTimer>
+#include <QProcess>
 #include <atomic>
 
-// Linux
+// Linux SocketCAN
 #ifdef Q_OS_LINUX
 #include <unistd.h>
 #include <net/if.h>
@@ -16,7 +18,9 @@
 #include <linux/can/raw.h>
 #endif
 
-// CAN-Worker for Linux only
+// ============================================================================
+// CAN WORKER
+// ============================================================================
 class CanWorker : public QObject
 {
     Q_OBJECT
@@ -26,6 +30,11 @@ public:
 public slots:
     void startWorker() {
         m_running = true;
+
+        // Inicjalizacja Watchdoga wewnątrz wątku pracownika
+        m_watchdogTimer = new QTimer(this);
+        connect(m_watchdogTimer, &QTimer::timeout, this, &CanWorker::onCanTimeout);
+        m_watchdogTimer->start(15000); // 15 sekund braku ramek = uśpienie
 
 #ifdef Q_OS_LINUX
         int socketCAN = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -60,6 +69,10 @@ public slots:
         while (m_running) {
             int nbytes = read(socketCAN, &frame, sizeof(frame));
             if (nbytes > 0) {
+                // Restart timera przy każdej poprawnej ramce
+                if (m_watchdogTimer) {
+                    m_watchdogTimer->start(15000);
+                }
                 parseFrame(frame);
             }
         }
@@ -72,6 +85,19 @@ public slots:
 
     void stopWorker() {
         m_running = false;
+        if (m_watchdogTimer) {
+            m_watchdogTimer->stop();
+        }
+    }
+
+private slots:
+    void onCanTimeout() {
+        qWarning() << "No CAN Frames for 15 sec. Going sleep mode";
+        m_running = false;
+
+        // Poprawiono vcgencmd (zamiast vcgecmd)
+        QProcess::execute("vcgencmd display_power 0");
+        QProcess::execute("sudo systemctl poweroff");
     }
 
 signals:
@@ -86,6 +112,7 @@ signals:
     void rangeKmReceived(int range);
     void fuelReserveChanged(bool active);
     void avgConsumptionReceived(double value);
+    void instantConsumptionReceived(double value);
     void turboReceived(double bar);
     void throttleReceived(double value);
     void tempReceived(double value);
@@ -102,15 +129,18 @@ signals:
 
 private:
     std::atomic<bool> m_running;
+    QTimer *m_watchdogTimer = nullptr;
     bool m_firstClickRecorded = false;
-    uint8_t m_lastFuelClick = 0;
+    uint16_t m_lastFuelClick = 0;
     double m_currentLitersPerHundred = 0.0;
     double m_lastKnownSpeed = 0.0;
+    double m_currentFuelLiters = 0.0;
 
 #ifdef Q_OS_LINUX
     void parseFrame(const struct can_frame &frame) {
         switch (frame.can_id) {
 
+        // Speed, ABS Warning, Traction Warning
         case 0x153: {
             if (frame.can_dlc >= 3) {
                 uint8_t b1 = static_cast<uint8_t>(frame.data[1]);
@@ -132,6 +162,7 @@ private:
             break;
         }
 
+        // Wheel speeds
         case 0x1F0: {
             if (frame.can_dlc >= 8) {
                 uint8_t d0 = static_cast<uint8_t>(frame.data[0]);
@@ -158,6 +189,7 @@ private:
             break;
         }
 
+        // RPM
         case 0x316: {
             if (frame.can_dlc >= 4) {
                 uint8_t lsb = static_cast<uint8_t>(frame.data[2]);
@@ -173,6 +205,7 @@ private:
             break;
         }
 
+        // Engine Temp & Throttle %
         case 0x329: {
             if (frame.can_dlc >= 6) {
                 uint8_t temp_raw = static_cast<uint8_t>(frame.data[1]);
@@ -182,7 +215,7 @@ private:
                 }
 
                 uint8_t throttle_raw = static_cast<uint8_t>(frame.data[5]);
-                double throttle_pct = static_cast<double>(throttle_raw);
+                double throttle_pct = static_cast<double>(throttle_raw) * 0.390625;
                 if (throttle_pct > 100.0) throttle_pct = 100.0;
                 if (throttle_pct < 0.0) throttle_pct = 0.0;
 
@@ -191,31 +224,48 @@ private:
             break;
         }
 
+        // MIL status, Oil temp, Fuel consumption (FCO 16-bit)
         case 0x545: {
-            if (frame.can_dlc >= 5) {
+            if (frame.can_dlc >= 3) {
                 uint8_t status_byte = static_cast<uint8_t>(frame.data[0]);
                 emit engineMilStatusReceived((status_byte & 0x02) != 0);
 
-                uint8_t currentClick = static_cast<uint8_t>(frame.data[2]);
+                uint8_t fco_lsb = static_cast<uint8_t>(frame.data[1]);
+                uint8_t fco_msb = static_cast<uint8_t>(frame.data[2]);
+                uint16_t currentFco = (static_cast<uint16_t>(fco_msb) << 8) | fco_lsb;
+
                 if (!m_firstClickRecorded) {
-                    m_lastFuelClick = currentClick;
+                    m_lastFuelClick = currentFco;
                     m_firstClickRecorded = true;
                 } else {
-                    int delta = (currentClick >= m_lastFuelClick)
-                    ? (currentClick - m_lastFuelClick)
-                    : ((255 - m_lastFuelClick) + currentClick + 1);
+                    uint16_t delta = 0;
+                    if (currentFco >= m_lastFuelClick) {
+                        delta = currentFco - m_lastFuelClick;
+                    } else {
+                        delta = (65535 - m_lastFuelClick) + currentFco + 1;
+                    }
+                    m_lastFuelClick = currentFco;
 
-                    m_lastFuelClick = currentClick;
-                    double litersPerHour = delta * 1.5;
+                    double litersPerHour = static_cast<double>(delta) * 1.5;
 
-                    if (m_lastKnownSpeed > 5.0) {
+                    if (m_lastKnownSpeed > 2.0) {
                         double instantConsumption = (litersPerHour / m_lastKnownSpeed) * 100.0;
-                        m_currentLitersPerHundred = (m_currentLitersPerHundred * 0.995) + (instantConsumption * 0.005);
+                        m_currentLitersPerHundred = (m_currentLitersPerHundred * 0.98) + (instantConsumption * 0.02);
+                        emit instantConsumptionReceived(instantConsumption);
+                    } else {
+                        emit instantConsumptionReceived(litersPerHour);
                     }
 
                     emit avgConsumptionReceived(m_currentLitersPerHundred);
-                }
 
+                    if (m_currentFuelLiters > 0.0 && m_currentLitersPerHundred > 0.0) {
+                        int calculatedRange = static_cast<int>((m_currentFuelLiters / m_currentLitersPerHundred) * 100.0);
+                        emit rangeKmReceived(calculatedRange);
+                    }
+                }
+            }
+
+            if (frame.can_dlc >= 5) {
                 uint8_t oil_raw = static_cast<uint8_t>(frame.data[4]);
                 double oil_temp = (oil_raw == 0x00 || oil_raw == 0xFF)
                                       ? 0.0
@@ -226,6 +276,7 @@ private:
             break;
         }
 
+        // Oil Pressure
         case 0x565: {
             if (frame.can_dlc >= 7) {
                 uint8_t oil_raw = static_cast<uint8_t>(frame.data[6]);
@@ -235,19 +286,13 @@ private:
             break;
         }
 
+        // Fuel Level & Fuel Reserve
         case 0x613: {
             if (frame.can_dlc >= 3) {
                 uint8_t fuel_raw = static_cast<uint8_t>(frame.data[2]);
-                double fuel = static_cast<double>(fuel_raw & 0x7F);
+                m_currentFuelLiters = static_cast<double>(fuel_raw & 0x7F);
 
-                emit fuelReceived(fuel);
-
-                double averageConsumption = m_currentLitersPerHundred;
-                int range = (fuel > 0.0 && averageConsumption > 0.0)
-                                ? static_cast<int>((fuel / averageConsumption) * 100.0)
-                                : 0;
-
-                emit rangeKmReceived(range);
+                emit fuelReceived(m_currentFuelLiters);
 
                 bool reserveActive = (fuel_raw & 0x80) != 0;
                 emit fuelReserveChanged(reserveActive);
@@ -255,6 +300,7 @@ private:
             break;
         }
 
+        // Statusy: Handbrake, Hood, Lights, Outdoor Temp
         case 0x615: {
             if (frame.can_dlc >= 5) {
                 uint8_t byte1 = static_cast<uint8_t>(frame.data[1]);
@@ -275,6 +321,7 @@ private:
             break;
         }
 
+        // Mileage & Display BC
         case 0x61A: {
             if (frame.can_dlc >= 3) {
                 uint32_t b0 = static_cast<uint8_t>(frame.data[0]);
@@ -287,6 +334,40 @@ private:
                     emit mileageReceived(mileage);
                 }
             }
+
+            if (frame.can_dlc >= 8) {
+                uint8_t b5 = static_cast<uint8_t>(frame.data[5]);
+                uint8_t b6 = static_cast<uint8_t>(frame.data[6]);
+                uint8_t b7 = static_cast<uint8_t>(frame.data[7]);
+
+                uint8_t bcMode = b7 & 0x0F;
+                bool isValidValue = !(b5 == 0xFE && b6 == 0x7F);
+
+                float rawValue = 0.0f;
+                if (isValidValue) {
+                    uint16_t combined = (static_cast<uint16_t>(b6) << 8) | b5;
+                    rawValue = combined / 10.0f;
+                }
+
+                switch (bcMode) {
+                case 0x03:
+                    if (isValidValue) {
+                        emit rangeKmReceived(static_cast<int>(rawValue));
+                    }
+                    break;
+
+                case 0x04:
+                    if (isValidValue) emit avgConsumptionReceived(rawValue);
+                    break;
+
+                case 0x09:
+                    if (isValidValue) emit instantConsumptionReceived(rawValue);
+                    break;
+
+                default:
+                    break;
+                }
+            }
             break;
         }
 
@@ -297,7 +378,9 @@ private:
 #endif
 };
 
-// 2. BACKEND API FOR QML / MAIN
+// ============================================================================
+// BACKEND API FOR QML / MAIN
+// ============================================================================
 class CanBusBackend : public QObject
 {
     Q_OBJECT
@@ -312,6 +395,7 @@ class CanBusBackend : public QObject
     Q_PROPERTY(int mileage READ mileage NOTIFY mileageChanged)
     Q_PROPERTY(bool fuelReserve READ fuelReserve NOTIFY fuelReserveChanged)
     Q_PROPERTY(double avgConsumption READ avgConsumption NOTIFY avgConsumptionChanged)
+    Q_PROPERTY(double instantConsumption READ instantConsumption NOTIFY instantConsumptionChanged)
     Q_PROPERTY(double throttle READ throttle NOTIFY throttleChanged)
     Q_PROPERTY(double outdoorTemp READ outdoorTemp NOTIFY outdoorTempChanged)
     Q_PROPERTY(bool doorLeft READ doorLeft NOTIFY doorLeftStatusChanged)
@@ -329,7 +413,7 @@ public:
         : QObject(parent),
         m_rpm(0), m_speed(0), m_oilTemp(0.0), m_oilPress(0.0),
         m_engineTemp(0.0), m_fuelAmount(0.0), m_rangeKm(0), m_turbo(0.0),
-        m_mileage(0), m_fuelReserve(false), m_avgConsumption(0.0),
+        m_mileage(0), m_fuelReserve(false), m_avgConsumption(0.0), m_instantConsumption(0.0),
         m_throttle(0.0), m_outdoorTemp(0.0), m_doorLeft(false),
         m_doorRight(false), m_hoodOpen(false), m_headlightsActive(false),
         m_trunkOpen(false), m_absWarning(false), m_tractionWarning(false),
@@ -352,6 +436,7 @@ public:
         connect(m_worker, &CanWorker::mileageReceived, this, &CanBusBackend::setMileage);
         connect(m_worker, &CanWorker::fuelReserveChanged, this, &CanBusBackend::setFuelReserve);
         connect(m_worker, &CanWorker::avgConsumptionReceived, this, &CanBusBackend::setAvgConsumption);
+        connect(m_worker, &CanWorker::instantConsumptionReceived, this, &CanBusBackend::setInstantConsumption);
         connect(m_worker, &CanWorker::throttleReceived, this, &CanBusBackend::setThrottle);
         connect(m_worker, &CanWorker::tempReceived, this, &CanBusBackend::setOutdoorTemp);
         connect(m_worker, &CanWorker::doorLeftStatusReceived, this, &CanBusBackend::setDoorLeft);
@@ -390,6 +475,7 @@ public:
     int mileage() const { return m_mileage; }
     bool fuelReserve() const { return m_fuelReserve; }
     double avgConsumption() const { return m_avgConsumption; }
+    double instantConsumption() const { return m_instantConsumption; }
     double throttle() const { return m_throttle; }
     double outdoorTemp() const { return m_outdoorTemp; }
     bool doorLeft() const { return m_doorLeft; }
@@ -414,6 +500,7 @@ public slots:
     void setMileage(int m) { if (m_mileage != m) { m_mileage = m; emit mileageChanged(); } }
     void setFuelReserve(bool fr) { if (m_fuelReserve != fr) { m_fuelReserve = fr; emit fuelReserveChanged(); } }
     void setAvgConsumption(double ac) { if (m_avgConsumption != ac) { m_avgConsumption = ac; emit avgConsumptionChanged(); } }
+    void setInstantConsumption(double ic) { if (m_instantConsumption != ic) { m_instantConsumption = ic; emit instantConsumptionChanged(); } }
     void setThrottle(double th) { if (m_throttle != th) { m_throttle = th; emit throttleChanged(); } }
     void setOutdoorTemp(double ot) { if (m_outdoorTemp != ot) { m_outdoorTemp = ot; emit outdoorTempChanged(); } }
     void setDoorLeft(bool dl) { if (m_doorLeft != dl) { m_doorLeft = dl; emit doorLeftStatusChanged(); } }
@@ -438,6 +525,7 @@ signals:
     void mileageChanged();
     void fuelReserveChanged();
     void avgConsumptionChanged();
+    void instantConsumptionChanged();
     void throttleChanged();
     void outdoorTempChanged();
     void doorLeftStatusChanged();
@@ -459,26 +547,27 @@ private:
 
     int m_rpm = 0;
     int m_speed = 0;
-    double m_oilTemp;
-    double m_oilPress;
-    double m_engineTemp;
-    double m_fuelAmount;
-    int m_rangeKm;
-    double m_turbo;
-    int m_mileage;
-    bool m_fuelReserve;
-    double m_avgConsumption;
-    double m_throttle;
-    double m_outdoorTemp;
-    bool m_doorLeft;
-    bool m_doorRight;
-    bool m_hoodOpen;
-    bool m_headlightsActive;
-    bool m_trunkOpen;
-    bool m_absWarning;
-    bool m_tractionWarning;
-    bool m_handbrake;
-    bool m_checkEngine;
+    double m_oilTemp = 0.0;
+    double m_oilPress = 0.0;
+    double m_engineTemp = 0.0;
+    double m_fuelAmount = 0.0;
+    int m_rangeKm = 0;
+    double m_turbo = 0.0;
+    int m_mileage = 0;
+    bool m_fuelReserve = false;
+    double m_avgConsumption = 0.0;
+    double m_instantConsumption = 0.0;
+    double m_throttle = 0.0;
+    double m_outdoorTemp = 0.0;
+    bool m_doorLeft = false;
+    bool m_doorRight = false;
+    bool m_hoodOpen = false;
+    bool m_headlightsActive = false;
+    bool m_trunkOpen = false;
+    bool m_absWarning = false;
+    bool m_tractionWarning = false;
+    bool m_handbrake = false;
+    bool m_checkEngine = false;
 };
 
 #endif // CANBUSBACKEND_H

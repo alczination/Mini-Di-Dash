@@ -49,15 +49,12 @@ Window {
         source: "assets/Michroma-Regular.ttf"
     }
 
-    /*
     Connections {
         target: canBusBackend
-        function onMileageReceived(mileage) { mainWindow.totalMileage = mileage }
-        function onTempReceived(value) { if(!mainWindow.testMode) mainWindow.outdoorTemp = value }
-        function onThrottleReceived(value) { if(!mainWindow.testMode) mainWindow.throttlePosition = value }
-        function onAbsWarningReceived(active) { if(!mainWindow.testMode) mainWindow._realAbsWarning = active }
-        function onTractionWarningReceived(active) { if(!mainWindow.testMode) mainWindow._realTractionWarning = active }
-        function onEngineMilStatusReceived(active) { if(!mainWindow.testMode) mainWindow._realCheckEngine = active }
+        //function onAbsWarningReceived(active) { if(!mainWindow.testMode) mainWindow._realAbsWarning = active }
+        // function onTractionWarningReceived(active) { if(!mainWindow.testMode) mainWindow._realTractionWarning = active }
+        // function onEngineMilStatusReceived(active) { if(!mainWindow.testMode) mainWindow._realCheckEngine = active }
+        /*
         function onClusterLightsReceived(leftBlinker, rightBlinker, headlights, handbrake) {
             if (!mainWindow.testMode) {
                 if (leftBlinker !== mainWindow.leftBlinkerActive || rightBlinker !== mainWindow.rightBlinkerActive) {
@@ -69,9 +66,13 @@ Window {
                 mainWindow.handbrakeActive = handbrake
             }
         }
-        function onLightsStatusReceived(enabled) {
-            headlightsActive = enabled;
+        */
+        function onLightsStatusChanged() {
+            if (!mainWindow.testMode) {
+                mainWindow.headlightsActive = canBusBackend.headlightsActive
+            }
         }
+
         function onFuelReserveChanged(active) {
             if (!mainWindow.testMode) {
                 if (active) {
@@ -91,8 +92,8 @@ Window {
                 }
             }
         }
+
     }
-    */
 
     property int centerMode: 0
     readonly property var modeNames: ["OSIĄGI", "SILNIK", "TRIP", "TURBO", "INSPEKCJA", "PARK", "OPONY", "USTAWIENIA"]
@@ -137,7 +138,7 @@ Window {
     }
 
     // Settings-Mode
-    property string activeLogoOption: "MODERN"
+    property string activeLogoOption: "MINI"
 
     property bool isZoomed: false
     onIsZoomedChanged: {
@@ -557,6 +558,9 @@ Window {
                             if (isRedline) {
                                 return mainWindow.redLineColor;
                             }
+                            if (mainWindow.lightTheme) {
+                                return headlightsActive ? "#EF7911" : "#474747";
+                            }
                             return headlightsActive ? "#ffffff" : "#474747";
                         }
                         visible: true
@@ -585,7 +589,12 @@ Window {
                         anchors.horizontalCenter: parent.horizontalCenter
                         radius: 1
                         antialiasing: true
-                        color: isRedline ? mainWindow.redLineColor : (mainWindow.lightTheme ? "#000000" : "#ffffff")
+                        color: {
+                            if (isRedline) {
+                                return mainWindow.redLineColor
+                            }
+                            return headlightsActive ? "#ffffff" : "#474747";
+                        }
                     }
                 }
             }
@@ -672,7 +681,12 @@ Window {
                                 return "#474747";
                             }
                             else {
+                                if (mainWindow.lightTheme) {
+                                    return "#EF7911";
+                                }
+                                else {
                                 return "#ffffff";
+                                }
                             }
                         }
                         scale: isReached ? 1.20 : 1.0
@@ -814,7 +828,6 @@ Window {
             property real centerAngle: -90
             property real angleSpacing: mainWindow.isZoomed ? 12 : 30
             property var lightsModel: [
-                { src: "control_lights/highbeam_light.png",  color: "#0066ff",  active: mainWindow.headlightsActive || mainWindow.isBulbCheckActive || mainWindow.testMode, isFullWidth: true },
                 { src: "control_lights/handbrake_light.png", color: mainWindow.redLineColor, active: mainWindow.handbrake, isFullWidth: false },
                 { src: "control_lights/dooropen_light.png",  color: mainWindow.redLineColor, active: mainWindow.doorLeftOpen || mainWindow.doorRightOpen || mainWindow.isBulbCheckActive, isFullWidth: false },
                 { src: "control_lights/hoodopen_light.png",   color: "#ffaa00",  active: mainWindow.hoodOpen || mainWindow.isBulbCheckActive, isFullWidth: false },
@@ -889,7 +902,7 @@ Window {
                 anchors.fill: parent
                 property color currentBorderColor: (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive)
                                                    ? mainWindow.redLineColor
-                                                   : (mainWindow.lightTheme ? "#cccccc" : Qt.darker(mainWindow.accentColor, 1.2))
+                                                   : (mainWindow.lightTheme ? "#EF7911" : Qt.darker(mainWindow.accentColor, 1.2))
 
                 Item {
                     anchors.fill: parent
@@ -950,11 +963,11 @@ Window {
                                                         "BRAK"      :   ""
                                                     })
                     readonly property var widthMap: ({
-                                                        "MINI"      :   310,
-                                                        "COOPER S"  :   105,
-                                                        "MODERN"    :   240,
-                                                        "BRAK"      :   0
-                                                    })
+                                                         "MINI"      :   310,
+                                                         "COOPER S"  :   105,
+                                                         "MODERN"    :   240,
+                                                         "BRAK"      :   0
+                                                     })
                     source: logoMap[mainWindow.activeLogoOption] || ""
                     width: widthMap[mainWindow.activeLogoOption] || 200
                     fillMode: Image.PreserveAspectFit
@@ -1330,7 +1343,6 @@ Window {
         LcdPanel {
             id: bottomLcdDisplay
             isZoomed: mainWindow.isZoomed
-            lightTheme: mainWindow.lightTheme
             infoMode: mainWindow.infoMode
             outdoorTemp: mainWindow.outdoorTemp
             fuelAmount: mainWindow.fuelAmount

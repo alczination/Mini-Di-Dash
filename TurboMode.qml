@@ -49,6 +49,7 @@ Grid {
             }
         }
     }
+    /*
     Row {
         width: 300; spacing: 20
         Image {
@@ -76,6 +77,7 @@ Grid {
             }
         }
     }
+    */
     Row {
         width: 300; spacing: 20
         Image {
