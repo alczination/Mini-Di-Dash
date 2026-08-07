@@ -73,6 +73,31 @@ Window {
             }
         }
 
+        function onIsSleepingChanged() {
+            if (!mainWindow.testMode) {
+                if (canBusBackend.isSleeping) {
+                    if (!mainWindow.standbyAlertTriggered && !mainWindow.isAlertActive) {
+                        mainWindow.standbyAlertTriggered = true
+                        mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
+                        mainWindow.alertMessage = mainWindow.alertStandby
+                        mainWindow.alertSubMessage = "SYSTEM ZOSTANIE\nWKRÓTCE UŚPIONY"
+                        mainWindow.alertColor = "#ffaa00"
+                        // mainWindow.alertIconSource = ???
+                        mainWindow.isAlertActive = true
+                        mainWindow.isZoomed = true
+                        alertTimeout.restart()
+                    }
+                } else {
+                        mainWindow.standbyAlertTriggered = false
+                        if (mainWindow.alertMessage === mainWindow.alertStandby) {
+                        mainWindow.isAlertActive = false
+                        mainWindow.isZoomed = mainWindow.wasZoomedBeforeAlert
+                        alertTimeout.stop()
+                    }
+                }
+            }
+        }
+
         function onFuelReserveChanged(active) {
             if (!mainWindow.testMode) {
                 if (active) {
@@ -185,40 +210,28 @@ Window {
     property bool useArcInsteadOfNeedle: !nestedMenuContainer.rpmType
 
     // Alerts
+    property string alertStandby: "TRYB UŚPIENIA"
     property string alertFuel: "REZERWA"
-    property string alertOutsideTemp: "TEMPERATURA\n ZEWNĘTRZNA"
-    property string alertOpenHood: "OTWARTA MASKA"
+    property string alertOutsideTemp: "TEMPERATURA\nZEWNĘTRZNA"
+    property string alertOpenHood: "MASKA"
     property string alertOpenTrunk: "OTWARTY BAGAŻNIK"
-    property string alertEngineTemp: "TEMPERATURA\n SILNIKA"
+    property string alertEngineTemp: "TEMPERATURA\nSILNIKA"
     property string alertOilPress: "CIŚNIENIE OLEJU"
     property string alertOilSensor: "AWARIA CZUJNIKA OLEJU"
-    property string alertABS: "AWARIA\n SYSTEMU ABS"
+    property string alertABS: "AWARIA\nSYSTEMU ABS"
     property string alertCheckEngine: "CHECK ENGINE"
+
     property bool fuelAlertTriggered: false
+    property bool standbyAlertTriggered: false
+
     property bool anyWarningActive: checkEngine || absWarning || tractionWarning || airbagWarning
     property bool isAlertActive: false
+    property int _currentTestAlertIndex: 0
+
     property string alertMessage: ""
     property string alertSubMessage: ""
     property color alertColor: "#ffaa00"
     property string alertIconSource: ""
-
-    onFuelAmountChanged: {
-        if (!testMode && canBusBackend.fuelReserve) {
-            if (!fuelAlertTriggered && !isAlertActive) {
-                fuelAlertTriggered = true
-                wasZoomedBeforeAlert = isZoomed
-                alertMessage = alertFuel
-                alertSubMessage = "NISKI POZIOM PALIWA"
-                alertColor = "#ffaa00"
-                alertIconSource = "control_lights/tank_light.png"
-                isAlertActive = true
-                isZoomed = true
-                alertTimeout.restart()
-            }
-        } else if (!canBusBackend.fuelReserve) {
-            fuelAlertTriggered = false
-        }
-    }
 
     Timer {
         id: startupBulbCheckTimer
@@ -391,36 +404,33 @@ Window {
                             if (event.key === Qt.Key_L) headlightsActive = !headlightsActive
 
                             if (event.key === Qt.Key_U) {
+
+                                var testAlerts = [
+                                    { msg: alertStandby, sub: "SYSTEM ZOSTANIE\nWKRÓTCE UŚPIONY", icon: "control_lights/tank_light.png", color: "#ffaa00" },
+                                    { msg: alertFuel, sub: "POZOSTAŁO 50 KM", icon: "control_lights/tank_light.png", color: "#ffaa00" },
+                                    { msg: alertOutsideTemp, sub: "-10°C", icon: "control_lights/lowtempoutside_light.png", color: "#ffaa00" },
+                                    { msg: alertOpenHood, sub: "SPRAWDŹ ZAMKNIĘCIE", icon: "control_lights/hoodopen_light.png", color: "#ffaa00" },
+                                    { msg: alertCheckEngine, sub: "SPRAWDŹ SILNIK!", icon: "control_lights/check_light.png", color: "#ffaa00" },
+                                    { msg: alertEngineTemp, sub: "ZGAŚ SILNIK", icon: "control_lights/temp_light.png", color: redLineColor },
+                                    { msg: alertOilPress, sub: "WYŁĄCZ SILNIK!", icon: "control_lights/oil_light.png", color: redLineColor },
+                                    { msg: alertABS, sub: "JEDŹ OSTROŻNIE!", icon: "control_lights/abs_light.png", color: redLineColor }
+                                ]
+
                                 if (!isAlertActive) {
-                                    wasZoomedBeforeAlert = isZoomed
-                                    alertMessage = alertFuel
-                                    alertSubMessage = "POZOSTAŁO 50 KM"
-                                    alertColor = "#ffaa00"
-                                    alertIconSource = "control_lights/tank_light.png"
+                                    mainWindow._currentTestAlertIndex=0
+                                } else {
+                                    mainWindow._currentTestAlertIndex = (mainWindow._currentTestAlertIndex + 1) % (testAlerts.length + 1)
+                                }
+
+                                if (mainWindow._currentTestAlertIndex < testAlerts.length) {
+                                    var current = testAlerts[mainWindow._currentTestAlertIndex]
+                                    if (!isAlertActive) wasZoomedBeforeAlert = isZoomed
+                                    alertMessage = current.msg
+                                    alertSubMessage = current.sub
+                                    alertIconSource = current.icon
+                                    alertColor = current.color
                                     isAlertActive = true
                                     isZoomed = true
-                                    alertTimeout.restart()
-                                } else if (alertMessage === alertFuel) {
-                                    alertMessage = alertOutsideTemp
-                                    alertSubMessage = "-10°C"
-                                    alertIconSource = "control_lights/lowtempoutside_light.png"
-                                    alertColor = "#ffaa00"
-                                    alertTimeout.restart()
-                                } else if (alertMessage === alertOpenHood) {
-                                    alertMessage = alertOpenHood
-                                    alertColor = "#ffaa00"
-                                    alertTimeout.restart()
-                                } else if (alertMessage === alertOutsideTemp) {
-                                    alertMessage = alertEngineTemp
-                                    alertSubMessage = "ZGAŚ SILNIK"
-                                    alertIconSource = "control_lights/temp_light.png"
-                                    alertColor = redLineColor
-                                    alertTimeout.restart()
-                                } else if (alertMessage === alertEngineTemp) {
-                                    alertMessage = alertOilPress
-                                    alertSubMessage = "WYŁĄCZ SILNIK!"
-                                    alertIconSource = "control_lights/oil_light.png"
-                                    alertColor = redLineColor
                                     alertTimeout.restart()
                                 } else {
                                     isAlertActive = false
@@ -685,7 +695,7 @@ Window {
                                     return "#EF7911";
                                 }
                                 else {
-                                return "#ffffff";
+                                    return "#ffffff";
                                 }
                             }
                         }
