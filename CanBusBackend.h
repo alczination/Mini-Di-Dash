@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QTimer>
 #include <QProcess>
+#include <QCoreApplication>
 #include <atomic>
 
 // Linux SocketCAN
@@ -62,19 +63,18 @@ public slots:
 
         struct timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 500000; // 500ms timeout
+        tv.tv_usec = 200000; // 200ms timeout na odczyt z gniazda (daje czas dla pętli zdarzeń)
         setsockopt(socketCAN, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
 
         struct can_frame frame;
         while (m_running) {
             int nbytes = read(socketCAN, &frame, sizeof(frame));
             if (nbytes > 0) {
-                // Restart timera przy każdej poprawnej ramce
-                if (m_watchdogTimer) {
-                    m_watchdogTimer->start(15000);
-                }
                 parseFrame(frame);
             }
+
+            // KLUCZOWE: Pozwól pętli zdarzeń Qt wykonać zdarzenia QTimer w tym wątku
+            QCoreApplication::processEvents();
         }
 
         close(socketCAN);
@@ -95,7 +95,7 @@ private slots:
         qWarning() << "No CAN Frames for 15 sec. Going sleep mode";
         m_running = false;
 
-        // Poprawiono vcgencmd (zamiast vcgecmd)
+        // Bezpieczne gaszenie ekranu i uśpienie RPi 5
         QProcess::execute("vcgencmd display_power 0");
         QProcess::execute("sudo systemctl poweroff");
     }
@@ -138,6 +138,13 @@ private:
 
 #ifdef Q_OS_LINUX
     void parseFrame(const struct can_frame &frame) {
+        // RESETUJEMY WATCHDOG TYLKO DLA KLUCZOWYCH RAMEK SILNIKA (RPM / Prędkość)
+        if (frame.can_id == 0x316 || frame.can_id == 0x153) {
+            if (m_watchdogTimer) {
+                m_watchdogTimer->start(15000);
+            }
+        }
+
         switch (frame.can_id) {
 
         // Speed, ABS Warning, Traction Warning
