@@ -5,6 +5,7 @@
 #include <QThread>
 #include <QDebug>
 #include <QTimer>
+#include <QProcess>
 #include <QCoreApplication>
 #include <atomic>
 
@@ -33,7 +34,7 @@ public slots:
 
         m_watchdogTimer = new QTimer(this);
         connect(m_watchdogTimer, &QTimer::timeout, this, &CanWorker::onCanTimeout);
-        m_watchdogTimer->start(15000); // 15 sekund braku ramek = standby
+        m_watchdogTimer->start(15000); // 15 sekund braku ramek = uśpienie zasobów
 
 #ifdef Q_OS_LINUX
         int socketCAN = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -91,7 +92,11 @@ private slots:
     void onCanTimeout() {
         if (!m_isSleeping) {
             m_isSleeping = true;
-            qWarning() << "[STANDBY] Brak ramek CAN przez 15 sek. Przejście w tryb czarnego ekranu...";
+            qWarning() << "[RESOURCE STANDBY] Brak ramek CAN. Obniżanie zegarów CPU i uśpienie interfejsu...";
+
+            // 1. Zrzucenie częstotliwości procesora RPi 5 z 2.4GHz na 600MHz
+            QProcess::execute("sh", QStringList() << "-c" << "echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill block all");
+            // 2. Wstrzymanie renderowania GUI w QML
             emit sleepStateChanged(true);
         }
     }
@@ -139,9 +144,14 @@ private:
         // RESETUJEMY WATCHDOG TYLKO DLA RAMEK SILNIKA (RPM / Prędkość)
         if (frame.can_id == 0x316 || frame.can_id == 0x153) {
 
+            // Jeśli system był w trybie Uśpienia Zasobów - wybudzamy CPU i Aplikację!
             if (m_isSleeping) {
                 m_isSleeping = false;
-                qWarning() << "[STANDBY] Wykryto ruch na CAN! Wybudzanie ekranu...";
+                qWarning() << "[RESOURCE STANDBY] Wykryto obroty silnika! Przywracanie pełnej mocy CPU...";
+
+                // 1. Przywrócenie pełnego taktowania CPU (ondemand / performance)
+                QProcess::execute("sh", QStringList() << "-c" << "echo ondemand | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill unblock all");
+                // 2. Wznowienie odświeżania GUI QML
                 emit sleepStateChanged(false);
             }
 
