@@ -92,11 +92,18 @@ private slots:
     void onCanTimeout() {
         if (!m_isSleeping) {
             m_isSleeping = true;
-            qWarning() << "[RESOURCE STANDBY] Brak ramek CAN. Obniżanie zegarów CPU i uśpienie interfejsu...";
+            qWarning() << "[RESOURCE STANDBY] Brak ramek CAN. Obniżanie zegarów CPU, gaszenie USB, Wi-Fi i HDMI...";
 
-            // 1. Zrzucenie częstotliwości procesora RPi 5 z 2.4GHz na 600MHz
+            // 1. Odcięcie zasilania 5V na USB (dla huba 2 oraz 3)
+            QProcess::execute("sh", QStringList() << "-c" << "sudo uhubctl -l 2 -a 0; sudo uhubctl -l 3 -a 0");
+
+            // 2. Taktowanie CPU na powersave (1.5GHz) + wyłączenie modułów Wi-Fi / BT
             QProcess::execute("sh", QStringList() << "-c" << "echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill block all");
-            // 2. Wstrzymanie renderowania GUI w QML
+
+            // 3. Wyłączenie wyjścia wideo HDMI w sterowniku Wayland / KMS
+            QProcess::execute("sh", QStringList() << "-c" << "WAYLAND_DISPLAY=wayland-0 kscreen-doctor output.HDMI-A-1.disable");
+
+            // 4. Powiadomienie GUI / main.cpp o uśpieniu (hide window)
             emit sleepStateChanged(true);
         }
     }
@@ -144,14 +151,21 @@ private:
         // RESETUJEMY WATCHDOG TYLKO DLA RAMEK SILNIKA (RPM / Prędkość)
         if (frame.can_id == 0x316 || frame.can_id == 0x153) {
 
-            // Jeśli system był w trybie Uśpienia Zasobów - wybudzamy CPU i Aplikację!
+            // Jeśli system był w trybie Uśpienia Zasobów - wybudzamy CPU, USB, HDMI i GUI!
             if (m_isSleeping) {
                 m_isSleeping = false;
-                qWarning() << "[RESOURCE STANDBY] Wykryto obroty silnika! Przywracanie pełnej mocy CPU...";
+                qWarning() << "[RESOURCE STANDBY] Wykryto obroty silnika! Przywracanie pełnej mocy...";
 
-                // 1. Przywrócenie pełnego taktowania CPU (ondemand / performance)
+                // 1. Włączenie zasilania USB (hub 2 oraz 3)
+                QProcess::execute("sh", QStringList() << "-c" << "sudo uhubctl -l 2 -a 1; sudo uhubctl -l 3 -a 1");
+
+                // 2. Taktowanie CPU do normalnego trybu (ondemand / do 2.4GHz) + włączenie Wi-Fi / BT
                 QProcess::execute("sh", QStringList() << "-c" << "echo ondemand | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill unblock all");
-                // 2. Wznowienie odświeżania GUI QML
+
+                // 3. Włączenie sygnału HDMI
+                QProcess::execute("sh", QStringList() << "-c" << "WAYLAND_DISPLAY=wayland-0 kscreen-doctor output.HDMI-A-1.enable");
+
+                // 4. Powiadomienie main.cpp / GUI o wybudzeniu (show window)
                 emit sleepStateChanged(false);
             }
 

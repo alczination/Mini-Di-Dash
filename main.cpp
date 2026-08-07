@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     engine.load(url);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
-                     &app, [url](QObject *obj, const QUrl &objUrl) {
+                     &app, [url, &canBackend](QObject *obj, const QUrl &objUrl) {
                          if (!obj && url == objUrl) {
                              QCoreApplication::exit(-1);
                          }
@@ -26,7 +26,17 @@ int main(int argc, char *argv[])
                          if (window) {
                              window->setWidth(720);
                              window->setHeight(720);
-                             // window->setMinimumSize(QSize(720, 720));
+
+                             // Reagowanie na zmianę stanu uśpienia z backendu CAN
+                             QObject::connect(&canBackend, &CanBusBackend::isSleepingChanged, window, [window, &canBackend]() {
+                                 if (canBackend.isSleeping()) {
+                                     // Ukrycie okna wstrzymuje renderowanie sceny QML i uwalnia GPU
+                                     window->hide();
+                                 } else {
+                                     // Przywrócenie widoczności i renderowania
+                                     window->show();
+                                 }
+                             });
                          }
                      }, Qt::QueuedConnection);
 
