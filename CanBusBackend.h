@@ -94,10 +94,8 @@ private slots:
     void onCanTimeout() {
         qWarning() << "No CAN Frames for 15 sec. Going sleep mode";
         m_running = false;
-
-        // Bezpieczne gaszenie ekranu i uśpienie RPi 5
         QProcess::execute("vcgencmd display_power 0");
-        QProcess::execute("sudo systemctl poweroff");
+        QProcess::execute("systemctl poweroff -i");
     }
 
 signals:
