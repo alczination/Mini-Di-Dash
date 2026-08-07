@@ -95,7 +95,7 @@ private slots:
         qWarning() << "No CAN Frames for 15 sec. Going sleep mode";
         m_running = false;
         QProcess::execute("vcgencmd display_power 0");
-        QProcess::execute("systemctl poweroff -i");
+        QProcess::execute("sudo /bin/systemctl poweroff");
     }
 
 signals:
