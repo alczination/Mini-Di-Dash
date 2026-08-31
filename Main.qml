@@ -8,7 +8,7 @@ Window {
     width: 720
     height: 720
     visible: true
-    color: lightTheme ? "#f0f0f0" : "#1a1a1a"
+    color: lightTheme ? "#bcbcbc" : "#1a1a1a"
 
     // FPS-Counter
     Item {
@@ -127,6 +127,7 @@ Window {
     property color electricBlue: "#00ccff"
     property color redLineColor: "#ff2200"
     property color accentColor: lightTheme ? Qt.darker(electricBlue, 1.2) : electricBlue
+    // property color accentColor: lightTheme ? "#505050" : electricBlue
     property int themeMode: 0
     property bool lightTheme: themeMode === 1
 
@@ -378,6 +379,22 @@ Window {
     Item {
         id: keyboardHandler
         focus: true
+
+        Timer {
+            id: longPressTimer
+            interval: 800
+            repeat: false
+            onTriggered: {
+                if (mainWindow.isAlertActive) {
+                    mainWindow.isAlertActive = false
+                    mainWindow.isZoomed = mainWindow.wasZoomedBeforeAlert
+                    alertTimeout.stop()
+                } else {
+                    mainWindow.isZoomed = !mainWindow.isZoomed
+                }
+            }
+        }
+
         z: 999
         Keys.onPressed: (event) => {
                             if (event.key === Qt.Key_F) showFps = !showFps
@@ -385,14 +402,12 @@ Window {
                             if (event.key === Qt.Key_Tab) infoMode = (infoMode + 1) % 5
 
                             if (event.key === Qt.Key_J) {
-                                if (isAlertActive) {
-                                    isAlertActive = false
-                                    isZoomed = wasZoomedBeforeAlert
-                                    alertTimeout.stop()
-                                } else {
-                                    isZoomed = !isZoomed
+                                if (!event.isAutoRepeat) {
+                                    longPressTimer.start()
                                 }
+                                event.accepted = true
                             }
+
                             if (event.key === Qt.Key_Q) {
                                 leftBlinkerActive = !leftBlinkerActive
                                 if (leftBlinkerActive) rightBlinkerActive = false
@@ -472,6 +487,19 @@ Window {
                                 }
                             }
                         }
+        Keys.onReleased: (event) => {
+                             if (event.key === Qt.Key_J) {
+                                 if (!event.isAutoRepeat) {
+                                     if (longPressTimer.running) {
+                                         longPressTimer.stop()
+                                         if (mainWindow.isZoomed) {
+                                             mainWindow.centerMode = (mainWindow.centerMode + 1) % 8
+                                         }
+                                     }
+                                 }
+                                 event.accepted = true
+                             }
+                         }
 
         Component.onCompleted: forceActiveFocus()
     }
@@ -688,7 +716,7 @@ Window {
                                 return isReached ? mainWindow.redLineColor : Qt.rgba(1, 0.3, 0.3, 0.8)
                             }
                             if (!headlightsActive) {
-                                return "#474747";
+                                return "#505050";
                             }
                             else {
                                 if (mainWindow.lightTheme) {
@@ -941,8 +969,11 @@ Window {
                         antialiasing: true
 
                         gradient: Gradient {
-                            GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#ffffff" : "#141414" }
-                            GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#e4e4e4" : "#050505" }
+                            // GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#ffffff" : "#141414" }
+                            GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#505050" : "#141414" }
+
+                            // GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#e4e4e4" : "#050505" }
+                            GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#505050" : "#050505" }
                         }
 
                         Rectangle {

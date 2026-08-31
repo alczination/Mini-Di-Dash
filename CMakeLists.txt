@@ -56,6 +56,8 @@ qt_add_qml_module(appMiniDashboard
         control_lights/turbo_symbol.png
         control_lights/gas_symbol.png
         control_lights/intake_symbol.png
+        SOURCES
+        SOURCES
 )
 
 target_include_directories(appMiniDashboard PRIVATE
