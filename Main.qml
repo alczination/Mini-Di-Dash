@@ -379,9 +379,10 @@ Window {
     Item {
         id: keyboardHandler
         focus: true
+        z: 999
 
         Timer {
-            id: longPressTimer
+            id: btn1LongPressTimer
             interval: 800
             repeat: false
             onTriggered: {
@@ -395,16 +396,35 @@ Window {
             }
         }
 
-        z: 999
+        Timer {
+            id: btn2LongPressTimer
+            interval: 800
+            repeat: false
+            onTriggered: {
+                if (mainWindow.isZoomed && mainWindow.centerMode === 7) {
+                    nestedMenuContainer.exitSubMenu()
+                } else {
+                    mainWindow.isZoomed = true
+                    mainWindow.centerMode = 7
+                }
+            }
+        }
+
         Keys.onPressed: (event) => {
+                            if (event.isAutoRepeat) {
+                                event.accepted = true
+                                return
+                            }
+
                             if (event.key === Qt.Key_F) showFps = !showFps
                             if (event.key === Qt.Key_T) testMode = !testMode
                             if (event.key === Qt.Key_Tab) infoMode = (infoMode + 1) % 5
 
                             if (event.key === Qt.Key_J) {
-                                if (!event.isAutoRepeat) {
-                                    longPressTimer.start()
-                                }
+                                btn1LongPressTimer.start()
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_K) {
+                                btn2LongPressTimer.start()
                                 event.accepted = true
                             }
 
@@ -488,13 +508,47 @@ Window {
                             }
                         }
         Keys.onReleased: (event) => {
+                             if (event.isAutoRepeat) {
+                                 event.accepted = true
+                                 return
+                             }
+
                              if (event.key === Qt.Key_J) {
-                                 if (!event.isAutoRepeat) {
-                                     if (longPressTimer.running) {
-                                         longPressTimer.stop()
-                                         if (mainWindow.isZoomed) {
+
+                                 if (btn1LongPressTimer.running) {
+                                     btn1LongPressTimer.stop()
+
+                                     if (mainWindow.isAlertActive) {
+                                         mainWindow.isAlertActive = false
+                                         mainWindow.isZoomed = mainWindow.wasZoomedBeforeAlert
+                                         alertTimeout.stop()
+                                     } else if (mainWindow.isZoomed) {
+                                         if (mainWindow.centerMode === 7) {
+                                             nestedMenuContainer.triggerAction()
+                                         } else {
                                              mainWindow.centerMode = (mainWindow.centerMode + 1) % 8
+                                             mainWindow.selectedSettingIndex = 0
                                          }
+                                     } else {
+                                         mainWindow.infoMode = (mainWindow.infoMode + 1) % 5
+                                     }
+                                 }
+                                 event.accepted = true
+                         }
+
+                             else if (event.key === Qt.Key_K) {
+                                 if (btn2LongPressTimer.running) {
+                                     btn2LongPressTimer.stop()
+
+                                     if (mainWindow.isZoomed) {
+                                         if (mainWindow.centerMode === 7) {
+                                            nestedMenuContainer.moveDown()
+                                         } else {
+                                            mainWindow.centerMode = (mainWindow.centerMode - 1 < 0) ? 7 : (mainWindow.centerMode - 1)
+                                            mainWindow.selectedSettingIndex = 0
+                                         }
+                                     } else {
+                                         mainWindow.infoMode = (mainWindow.infoMode - 1 < 0) ? 4 : (mainWindow.infoMode - 1)
                                      }
                                  }
                                  event.accepted = true
