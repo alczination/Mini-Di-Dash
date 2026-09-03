@@ -62,6 +62,8 @@ public slots:
         }
         emit avgConsumptionReceived(m_currentLitersPerHundred);
 
+        // --- AUTOWYŁĄCZANIE / STANDBY TYMCZASOWO WYŁĄCZONE ---
+        /*
         m_watchdogTimer = new QTimer(this);
         m_watchdogTimer->setSingleShot(true);
         connect(m_watchdogTimer, &QTimer::timeout, this, &CanWorker::onCanTimeout);
@@ -70,6 +72,7 @@ public slots:
         m_shutdownTimer = new QTimer(this);
         m_shutdownTimer->setSingleShot(true);
         connect(m_shutdownTimer, &QTimer::timeout, this, &CanWorker::onShutdownTimeout);
+        */
 
 #ifdef Q_OS_LINUX
         int socketCAN = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -138,12 +141,14 @@ public slots:
 
 private slots:
     void onCanTimeout() {
+        // --- WYŁĄCZONE ---
+        /*
         if (!m_isSleeping) {
             m_isSleeping = true;
             qWarning() << "[RESOURCE STANDBY] Brak ramek CAN. Obniżanie zegarów CPU, gaszenie USB, Wi-Fi i HDMI...";
 
             QProcess::execute("sh", QStringList() << "-c" << "sudo uhubctl -l 2 -a 0; sudo uhubctl -l 3 -a 0");
-            QProcess::execute("sh", QStringList() << "-c" << "echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill block all");
+            QProcess::execute("sh", QStringList() << "-c" << "echo powersave | sudo tee /sys/devices/system/cpu/cpu* /cpufreq/scaling_governor && sudo rfkill block all");
             QProcess::execute("sh", QStringList() << "-c" << "WAYLAND_DISPLAY=wayland-0 kscreen-doctor output.HDMI-A-1.disable");
 
             emit sleepStateChanged(true);
@@ -152,15 +157,19 @@ private slots:
                 m_shutdownTimer->start(30000);
             }
         }
+        */
     }
 
     void onShutdownTimeout() {
+        // --- WYŁĄCZONE ---
+        /*
         qWarning() << "[SHUTDOWN] Czyszczenie bufora MCP2515 i zamykanie systemu...";
 #ifdef Q_OS_LINUX
         QProcess::execute("sh", QStringList() << "-c" << "sudo ip link set can0 down && sudo ip link set can0 up type can bitrate 500000");
 #endif
         QProcess::execute("sync");
         QProcess::execute("sudo", QStringList() << "shutdown" << "-h" << "now");
+        */
     }
 
 signals:
@@ -214,23 +223,10 @@ private:
 #ifdef Q_OS_LINUX
     void parseFrame(const struct can_frame &frame) {
         if (frame.can_id == 0x316 || frame.can_id == 0x153) {
+            // --- WYŁĄCZONE PRZYWRACANIE ZASOBÓW (ZACHOWANY JEDYNIE STAN LOGICZNY) ---
             if (m_isSleeping) {
                 m_isSleeping = false;
-                qWarning() << "[RESOURCE STANDBY] Wykryto obroty silnika! Przywracanie pełnej mocy...";
-
-                if (m_shutdownTimer) {
-                    m_shutdownTimer->stop();
-                }
-
-                QProcess::execute("sh", QStringList() << "-c" << "sudo uhubctl -l 2 -a 1; sudo uhubctl -l 3 -a 1");
-                QProcess::execute("sh", QStringList() << "-c" << "echo ondemand | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill unblock all");
-                QProcess::execute("sh", QStringList() << "-c" << "WAYLAND_DISPLAY=wayland-0 kscreen-doctor output.HDMI-A-1.enable");
-
                 emit sleepStateChanged(false);
-            }
-
-            if (m_watchdogTimer) {
-                m_watchdogTimer->start(30000);
             }
         }
 
