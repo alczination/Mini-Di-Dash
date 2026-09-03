@@ -766,7 +766,7 @@ Window {
                     Rectangle {
                         width: isMajorTick ? 9 : 5
                         height: isMajorTick ? 50 : 22
-                        y: 17
+                        y: mainWindow.lightTheme ? 8 : 17
                         anchors.horizontalCenter: parent.horizontalCenter
                         radius: 1
                         antialiasing: true
