@@ -4,8 +4,8 @@ import QtQuick.Effects
 Column {
     id: inspectionModeRoot
 
-    property real serviceOilKm: -12000
-    property real serviceBrakesKm: 1200
+    property real serviceOilKm: 150000
+    property real serviceBrakesKm: 30000
     property var inspectionDate: new Date(2026, 5, 1)
 
     property bool lightTheme: false
@@ -32,7 +32,7 @@ Column {
                 text: inspectionModeRoot.serviceOilKm + " KM";
                 color: inspectionModeRoot.serviceOilKm < 500 ? inspectionModeRoot.redLineColor : (inspectionModeRoot.lightTheme ? "black" : "white");
                 font.family: "Michroma";
-                font.pixelSize: 30;
+                font.pixelSize: 25;
                 font.bold: true;
                 anchors.horizontalCenter: parent.horizontalCenter
             }
@@ -50,7 +50,7 @@ Column {
                 text: inspectionModeRoot.serviceBrakesKm + " KM";
                 color: inspectionModeRoot.serviceBrakesKm < 500 ? inspectionModeRoot.redLineColor : (inspectionModeRoot.lightTheme ? "black" : "white");
                 font.family: "Michroma";
-                font.pixelSize: 30;
+                font.pixelSize: 25;
                 font.bold: true;
                 anchors.horizontalCenter: parent.horizontalCenter
             }

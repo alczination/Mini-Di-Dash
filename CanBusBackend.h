@@ -7,6 +7,10 @@
 #include <QTimer>
 #include <QProcess>
 #include <QCoreApplication>
+#include <QSettings>
+#include <QElapsedTimer>
+#include <algorithm>
+#include <cmath>
 #include <atomic>
 
 // Linux SocketCAN
@@ -26,16 +30,42 @@ class CanWorker : public QObject
 {
     Q_OBJECT
 public:
-    explicit CanWorker(QObject *parent = nullptr) : QObject(parent), m_running(false) {}
+    explicit CanWorker(QObject *parent = nullptr)
+        : QObject(parent), m_running(false)
+    {
+        // Odczyt trwałych danych spalania i przebiegu z dysku/pamięci
+        QSettings settings("MiniDiDash", "MiniDiDash");
+        m_totalConsumedLiters = settings.value("trip/consumedLiters", 0.0).toDouble();
+        m_totalDistanceKm = settings.value("trip/distanceKm", 0.0).toDouble();
+        m_currentLitersPerHundred = settings.value("trip/avgConsumption", 8.2).toDouble();
+
+        if (m_totalDistanceKm > 0.5 && m_totalConsumedLiters > 0.05) {
+            m_currentLitersPerHundred = (m_totalConsumedLiters / m_totalDistanceKm) * 100.0;
+        } else {
+            m_currentLitersPerHundred = 8.2;
+        }
+
+        // Bezpieczny odczyt ostatniego poprawnego przebiegu
+        m_lastValidMileage = settings.value("odometer/totalMileage", 270000).toInt();
+        m_savedMileageToDisk = m_lastValidMileage;
+
+        m_fuelTimer.start();
+    }
 
 public slots:
     void startWorker() {
         m_running = true;
 
+        // Natychmiast emitujemy bezpieczny stan z pamięci, zanim przyjdzie pierwsza ramka
+        if (m_lastValidMileage > 0) {
+            emit mileageReceived(m_lastValidMileage);
+        }
+        emit avgConsumptionReceived(m_currentLitersPerHundred);
+
         m_watchdogTimer = new QTimer(this);
         m_watchdogTimer->setSingleShot(true);
         connect(m_watchdogTimer, &QTimer::timeout, this, &CanWorker::onCanTimeout);
-        m_watchdogTimer->start(30000); // 30 sekund braku ramek = uśpienie zasobów
+        m_watchdogTimer->start(30000);
 
         m_shutdownTimer = new QTimer(this);
         m_shutdownTimer->setSingleShot(true);
@@ -67,7 +97,7 @@ public slots:
 
         struct timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 200000; // 200ms timeout
+        tv.tv_usec = 200000;
         setsockopt(socketCAN, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
 
         struct can_frame frame;
@@ -93,42 +123,43 @@ public slots:
         }
     }
 
+    void resetTripConsumption() {
+        m_totalConsumedLiters = 0.0;
+        m_totalDistanceKm = 0.0;
+        m_currentLitersPerHundred = 8.2;
+
+        QSettings settings("MiniDiDash", "MiniDiDash");
+        settings.setValue("trip/consumedLiters", 0.0);
+        settings.setValue("trip/distanceKm", 0.0);
+        settings.setValue("trip/avgConsumption", 8.2);
+
+        emit avgConsumptionReceived(m_currentLitersPerHundred);
+    }
+
 private slots:
     void onCanTimeout() {
         if (!m_isSleeping) {
             m_isSleeping = true;
             qWarning() << "[RESOURCE STANDBY] Brak ramek CAN. Obniżanie zegarów CPU, gaszenie USB, Wi-Fi i HDMI...";
 
-            // 1. Odcięcie zasilania 5V na USB (dla huba 2 oraz 3)
             QProcess::execute("sh", QStringList() << "-c" << "sudo uhubctl -l 2 -a 0; sudo uhubctl -l 3 -a 0");
-
-            // 2. Taktowanie CPU na powersave (1.5GHz) + wyłączenie modułów Wi-Fi / BT
             QProcess::execute("sh", QStringList() << "-c" << "echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill block all");
-
-            // 3. Wyłączenie wyjścia wideo HDMI w sterowniku Wayland / KMS
             QProcess::execute("sh", QStringList() << "-c" << "WAYLAND_DISPLAY=wayland-0 kscreen-doctor output.HDMI-A-1.disable");
 
-            // 4. Powiadomienie GUI / main.cpp o uśpieniu (hide window)
             emit sleepStateChanged(true);
 
-            if (m_shutdownTimer)
-            {
+            if (m_shutdownTimer) {
                 m_shutdownTimer->start(30000);
             }
         }
     }
+
     void onShutdownTimeout() {
         qWarning() << "[SHUTDOWN] Czyszczenie bufora MCP2515 i zamykanie systemu...";
-
 #ifdef Q_OS_LINUX
-        // 1. Zrestartuj interfejs CAN, aby opróżnić sprzętowe bufory odbiorcze MCP2515
         QProcess::execute("sh", QStringList() << "-c" << "sudo ip link set can0 down && sudo ip link set can0 up type can bitrate 500000");
 #endif
-
-        // 2. Zrzut pamięci na dysk (ochrona karty SD)
         QProcess::execute("sync");
-
-        // 3. Pełny shutdown
         QProcess::execute("sudo", QStringList() << "shutdown" << "-h" << "now");
     }
 
@@ -167,16 +198,22 @@ private:
     bool m_isSleeping = false;
     bool m_firstClickRecorded = false;
     uint16_t m_lastFuelClick = 0;
-    double m_currentLitersPerHundred = 0.0;
+    double m_currentLitersPerHundred = 8.2;
     double m_lastKnownSpeed = 0.0;
     double m_currentFuelLiters = 0.0;
+    double m_filteredRange = 0.0;
+
+    int m_lastValidMileage = 0;
+    int m_savedMileageToDisk = 0;
+
+    double m_totalConsumedLiters = 0.0;
+    double m_totalDistanceKm = 0.0;
+    QElapsedTimer m_fuelTimer;
+    int m_saveCounter = 0;
 
 #ifdef Q_OS_LINUX
     void parseFrame(const struct can_frame &frame) {
-        // RESETUJEMY WATCHDOG TYLKO DLA RAMEK SILNIKA (RPM / Prędkość)
         if (frame.can_id == 0x316 || frame.can_id == 0x153) {
-
-            // Jeśli system był w trybie Uśpienia Zasobów - wybudzamy CPU, USB, HDMI i GUI!
             if (m_isSleeping) {
                 m_isSleeping = false;
                 qWarning() << "[RESOURCE STANDBY] Wykryto obroty silnika! Przywracanie pełnej mocy...";
@@ -185,16 +222,10 @@ private:
                     m_shutdownTimer->stop();
                 }
 
-                // 1. Włączenie zasilania USB (hub 2 oraz 3)
                 QProcess::execute("sh", QStringList() << "-c" << "sudo uhubctl -l 2 -a 1; sudo uhubctl -l 3 -a 1");
-
-                // 2. Taktowanie CPU do normalnego trybu (ondemand / do 2.4GHz) + włączenie Wi-Fi / BT
                 QProcess::execute("sh", QStringList() << "-c" << "echo ondemand | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor && sudo rfkill unblock all");
-
-                // 3. Włączenie sygnału HDMI
                 QProcess::execute("sh", QStringList() << "-c" << "WAYLAND_DISPLAY=wayland-0 kscreen-doctor output.HDMI-A-1.enable");
 
-                // 4. Powiadomienie main.cpp / GUI o wybudzeniu (show window)
                 emit sleepStateChanged(false);
             }
 
@@ -299,6 +330,9 @@ private:
                 uint8_t fco_msb = static_cast<uint8_t>(frame.data[2]);
                 uint16_t currentFco = (static_cast<uint16_t>(fco_msb) << 8) | fco_lsb;
 
+                qint64 dtMs = m_fuelTimer.restart();
+                if (dtMs <= 0 || dtMs > 1000) dtMs = 100;
+
                 if (!m_firstClickRecorded) {
                     m_lastFuelClick = currentFco;
                     m_firstClickRecorded = true;
@@ -311,21 +345,50 @@ private:
                     }
                     m_lastFuelClick = currentFco;
 
-                    double litersPerHour = static_cast<double>(delta) * 1.5;
+                    if (delta < 2500) {
+                        double litersPerHour = static_cast<double>(delta) * 1.5;
 
-                    if (m_lastKnownSpeed > 2.0) {
-                        double instantConsumption = (litersPerHour / m_lastKnownSpeed) * 100.0;
-                        m_currentLitersPerHundred = (m_currentLitersPerHundred * 0.98) + (instantConsumption * 0.02);
-                        emit instantConsumptionReceived(instantConsumption);
-                    } else {
-                        emit instantConsumptionReceived(litersPerHour);
-                    }
+                        double litersUsedNow = (litersPerHour / 3600.0) * (static_cast<double>(dtMs) / 1000.0);
+                        m_totalConsumedLiters += litersUsedNow;
 
-                    emit avgConsumptionReceived(m_currentLitersPerHundred);
+                        if (m_lastKnownSpeed > 2.0) {
+                            double distanceKmNow = (m_lastKnownSpeed / 3600.0) * (static_cast<double>(dtMs) / 1000.0);
+                            m_totalDistanceKm += distanceKmNow;
 
-                    if (m_currentFuelLiters > 0.0 && m_currentLitersPerHundred > 0.0) {
-                        int calculatedRange = static_cast<int>((m_currentFuelLiters / m_currentLitersPerHundred) * 100.0);
-                        emit rangeKmReceived(calculatedRange);
+                            double instantConsumption = (litersPerHour / m_lastKnownSpeed) * 100.0;
+                            emit instantConsumptionReceived(std::clamp(instantConsumption, 0.5, 35.0));
+                        } else {
+                            emit instantConsumptionReceived(litersPerHour);
+                        }
+
+                        if (m_totalDistanceKm >= 0.5 && m_totalConsumedLiters > 0.05) {
+                            m_currentLitersPerHundred = (m_totalConsumedLiters / m_totalDistanceKm) * 100.0;
+                        }
+
+                        emit avgConsumptionReceived(m_currentLitersPerHundred);
+
+                        if (m_currentFuelLiters > 0.5) {
+                            double safeConsumption = std::clamp(m_currentLitersPerHundred, 6.0, 11.5);
+                            double targetRange = (m_currentFuelLiters / safeConsumption) * 100.0;
+
+                            if (m_filteredRange <= 1.0) {
+                                m_filteredRange = targetRange;
+                            } else {
+                                m_filteredRange = (m_filteredRange * 0.98) + (targetRange * 0.02);
+                            }
+
+                            emit rangeKmReceived(static_cast<int>(std::round(m_filteredRange)));
+                        } else {
+                            emit rangeKmReceived(0);
+                        }
+
+                        if (++m_saveCounter >= 100) {
+                            m_saveCounter = 0;
+                            QSettings settings("MiniDiDash", "MiniDiDash");
+                            settings.setValue("trip/consumedLiters", m_totalConsumedLiters);
+                            settings.setValue("trip/distanceKm", m_totalDistanceKm);
+                            settings.setValue("trip/avgConsumption", m_currentLitersPerHundred);
+                        }
                     }
                 }
             }
@@ -393,10 +456,27 @@ private:
                 uint32_t b1 = static_cast<uint8_t>(frame.data[1]);
                 uint32_t b2 = static_cast<uint8_t>(frame.data[2]) & 0x0F;
 
-                int mileage = static_cast<int>((b2 << 16) | (b1 << 8) | b0);
+                uint32_t raw_units = (b2 << 16) | (b1 << 8) | b0;
+                int mileage = static_cast<int>(raw_units * 10);
 
-                if (mileage > 0) {
-                    emit mileageReceived(mileage);
+                // Sanity check: filtr śmieci rozruchowych (< 50 000 km i > 999 999 km)
+                if (mileage >= 50000 && mileage <= 999999) {
+                    if (m_lastValidMileage > 0) {
+                        // Odrzucamy nierealne skoki w górę lub nagłe cofnięcie
+                        if (mileage >= (m_lastValidMileage - 5) && mileage <= (m_lastValidMileage + 500)) {
+                            m_lastValidMileage = mileage;
+                            emit mileageReceived(mileage);
+
+                            if (mileage - m_savedMileageToDisk >= 1) {
+                                m_savedMileageToDisk = mileage;
+                                QSettings settings("MiniDiDash", "MiniDiDash");
+                                settings.setValue("odometer/totalMileage", mileage);
+                            }
+                        }
+                    } else {
+                        m_lastValidMileage = mileage;
+                        emit mileageReceived(mileage);
+                    }
                 }
             }
 
@@ -415,20 +495,9 @@ private:
                 }
 
                 switch (bcMode) {
-                case 0x03:
-                    if (isValidValue) {
-                        emit rangeKmReceived(static_cast<int>(rawValue));
-                    }
-                    break;
-
-                case 0x04:
-                    if (isValidValue) emit avgConsumptionReceived(rawValue);
-                    break;
-
                 case 0x09:
                     if (isValidValue) emit instantConsumptionReceived(rawValue);
                     break;
-
                 default:
                     break;
                 }
@@ -480,12 +549,17 @@ public:
         m_isSleeping(false),
         m_rpm(0), m_speed(0), m_oilTemp(0.0), m_oilPress(0.0),
         m_engineTemp(0.0), m_fuelAmount(0.0), m_rangeKm(0), m_turbo(0.0),
-        m_mileage(0), m_fuelReserve(false), m_avgConsumption(0.0), m_instantConsumption(0.0),
+        m_mileage(0), m_fuelReserve(false), m_avgConsumption(8.2), m_instantConsumption(0.0),
         m_throttle(0.0), m_outdoorTemp(0.0), m_doorLeft(false),
         m_doorRight(false), m_hoodOpen(false), m_headlightsActive(false),
         m_trunkOpen(false), m_absWarning(false), m_tractionWarning(false),
         m_handbrake(false), m_checkEngine(false)
     {
+        // Wczytanie bezpiecznego przebiegu bezpośrednio w GUI
+        QSettings settings("MiniDiDash", "MiniDiDash");
+        m_mileage = settings.value("odometer/totalMileage", 270000).toInt();
+        m_avgConsumption = settings.value("trip/avgConsumption", 8.2).toDouble();
+
         m_worker = new CanWorker();
         m_worker->moveToThread(&m_workerThread);
 
@@ -529,6 +603,12 @@ public:
         }
         m_workerThread.quit();
         m_workerThread.wait();
+    }
+
+    Q_INVOKABLE void resetTripConsumption() {
+        if (m_worker) {
+            QMetaObject::invokeMethod(m_worker, "resetTripConsumption", Qt::QueuedConnection);
+        }
     }
 
     // Getters QML
@@ -627,7 +707,7 @@ private:
     double m_turbo = 0.0;
     int m_mileage = 0;
     bool m_fuelReserve = false;
-    double m_avgConsumption = 0.0;
+    double m_avgConsumption = 8.2;
     double m_instantConsumption = 0.0;
     double m_throttle = 0.0;
     double m_outdoorTemp = 0.0;

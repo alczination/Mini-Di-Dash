@@ -15,6 +15,7 @@ ListView {
     property int maxItemsCount: 6
     property bool lightTheme: false
     property color electricBlue: "#00ccff"
+    property color volcanoOrange: "#ef7911"
     property string fontName: "Michroma"
 
     property string currentTheme: lightTheme ? "JASNY" : "CIEMNY"
@@ -28,14 +29,20 @@ ListView {
     property bool oilPressureSensorActive: true
     property bool tpmsSensorActive: false
     property bool perfShiftActive: true
+    property bool gearIndicatorActive: false
 
     property bool showFps: false
 
     signal themeChanged()
     signal fpsToggled()
+    signal logoChanged(string newLogo)
+
     signal turboCalibrated()
     signal tripReset()
-    signal logoChanged(string newLogo)
+    signal consumptionReset()
+
+    signal oilReset()
+    signal brakesReset()
     signal inspectionReset()
 
     model: mainCategoriesModel
@@ -102,6 +109,7 @@ ListView {
         ListElement { name: "ANIMACJA STARTOWA"; category: "choice"; type: "toggle"; idNum: 8 }
         ListElement { name: "JASNOŚĆ"; category: "APP"; type: "choice"; idNum: 9 }
         // Dodatkowe systemy
+        ListElement { name: "CZUJ. BIEG"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 15 }
         ListElement { name: "AS. PARK."; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 10 }
         ListElement { name: "CIŚN. TURBO"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 11 }
         ListElement { name: "CIŚN. OLEJ"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 12 }
@@ -112,11 +120,12 @@ ListView {
         // ListElement { name: "KASOWANIE BŁĘDÓW"; category: "DIAG"; type: "action"; idNum: 16 }
         // ListElement { name: "NAPIĘCIE AKU"; category: "DIAG"; type: "status"; idNum: 17 }
         ListElement { name: "RESET TRIP"; category: "DIAG"; type: "action"; idNum: 18 }
+        ListElement { name: "RESET SPALANIE"; category: "DIAG"; type: "action"; idNum: 16 }
         // Serwis
         ListElement { name: "RESET HAMULCE"; category: "SERVICE"; type: "action"; idNum: 19 }
         ListElement { name: "RESET OLEJ"; category: "SERVICE"; type: "action"; idNum: 20 }
         ListElement { name: "RESET PRZEGLĄD"; category: "SERVICE"; type: "action"; idNum: 21 }
-        ListElement { name: "RESET FILTR KAB."; category: "SERVICE"; type: "action"; idNum: 22 }
+        // ListElement { name: "RESET FILTR KAB."; category: "SERVICE"; type: "action"; idNum: 22 }
         // System
         ListElement { name: "LICZNIK FPS"; category: "SYSTEM"; type: "toggle"; idNum: 23 }
         ListElement { name: "CAN-BUS"; category: "SYSTEM"; type: "status"; idNum: 24 }
@@ -150,8 +159,14 @@ ListView {
                     case 12: oilPressureSensorActive = !oilPressureSensorActive; break;
                     case 13: tpmsSensorActive = !tpmsSensorActive; break;
                     case 14: perfShiftActive = !perfShiftActive; break;
+                    case 15: gearIndicatorActive = !gearIndicatorActive; break;
+                    case 16: consumptionReset(); break;
+
                     case 18: tripReset(); break;
+                    case 19: brakesReset(); break;
+                    case 20: oilReset(); break;
                     case 21: inspectionReset(); break;
+
                     case 23: showFps = !showFps; fpsToggled(); break;
                     case 25: currentCanFreq = (currentCanFreq === "50Hz") ? "100Hz" : "50Hz"; break;
                     }
@@ -165,18 +180,20 @@ ListView {
         width: settingsModeRoot.width
         height: 55
         radius: 6
-
         property bool isSelected: index == settingsModeRoot.currentIndex
-        color: isSelected ? Qt.rgba(0, 0.8, 1, 0.18) : (settingsModeRoot.lightTheme ? "#e8e8e8" : "#222222")
-        border.color: isSelected ? settingsModeRoot.electricBlue : "transparent"
-        border.width: isSelected ? 1.5 : 0
+        readonly property color activeAccentColor: settingsModeRoot.lightTheme ? volcanoOrange : electricBlue
+        readonly property color selectedBgColor: settingsModeRoot.lightTheme ? Qt.rgba(0.94, 0.47, 0.07, 0.18) : Qt.rgba(0, 0.8, 1, 0.18)
+        readonly property color idleBgColor: settingsModeRoot.lightTheme ? "#f0f2f5" : "#1f1f1f"
+        color: isSelected ? selectedBgColor : idleBgColor
+        border.width: isSelected ? 1.5 : (settingsModeRoot.lightTheme ? 1 : 0)
+        border.color: isSelected ? activeAccentColor : (settingsModeRoot.lightTheme ? "#d8dce2" : "transparent")
 
         Text {
             visible: settingsModeRoot.currentSubMenu === ""
             text: model.name ? model.name : ""
-            color: itemRow.isSelected ? settingsModeRoot.electricBlue : (settingsModeRoot.lightTheme ? "black" : "white")
+            color: itemRow.isSelected ? itemRow.activeAccentColor : (settingsModeRoot.lightTheme ? "#1a1a1a" : "#ffffff")
             font.family: settingsModeRoot.fontName
-            font.pixelSize: 22;
+            font.pixelSize: 22
             font.bold: true
             anchors.centerIn: parent
         }
@@ -187,7 +204,9 @@ ListView {
 
             Text {
                 text: model.name ? model.name : ""
-                color: model.type === "back" ? "#ff2200" : (settingsModeRoot.lightTheme ? "black" : "white")
+                color: model.type === "back" ? "#ff2200" : (itemRow.isSelected
+                                                            ? (settingsModeRoot.lightTheme ? "#000000" : "#ffffff")
+                                                            : (settingsModeRoot.lightTheme ? "#444444" : "#aaaaaa"))
                 font.family: settingsModeRoot.fontName
                 font.pixelSize: 16;
                 font.bold: true
@@ -219,7 +238,7 @@ ListView {
                         case 12: return settingsModeRoot.oilPressureSensorActive ? "WŁ." : "WYŁ."
                         case 13: return settingsModeRoot.tpmsSensorActive ? "WŁ." : "WYŁ."
                         case 14: return settingsModeRoot.perfShiftActive ? "WŁ." : "WYŁ."
-
+                        case 15: return settingsModeRoot.gearIndicatorActive ? "WŁ." : "WYŁ."
                         case 23: return settingsModeRoot.showFps ? "WŁ." : "WYŁ."
                         default: return "WYŁ"
                         }

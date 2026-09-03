@@ -2,6 +2,7 @@ import QtQuick.Effects
 import QtQuick.Controls
 import QtQuick.Shapes
 import QtQuick 2.15
+import QtCore
 
 Window {
     id: mainWindow
@@ -9,6 +10,28 @@ Window {
     height: 720
     visible: true
     color: lightTheme ? "#bcbcbc" : "#1a1a1a"
+
+    Settings {
+        id: appSettings
+        category: "ClusterData"
+        property alias totalMileage: mainWindow.totalMileage
+        // property alias fuelAmount: mainWindow.fuelAmount
+        property alias rangeKm: mainWindow.rangeKm
+        property alias themeMode: mainWindow.themeMode
+        property alias activelogoOption: mainWindow.activeLogoOption
+
+        property alias rpmType: nestedMenuContainer.rpmType
+        property alias gaugeSweepActive: nestedMenuContainer.gaugeSweepActive
+        property alias gearIndicatorActive: nestedMenuContainer.gearIndicatorActive
+        property alias parkingAssistant: nestedMenuContainer.parkingAssistant
+        property alias tpmsSensorActive: nestedMenuContainer.tpmsSensorActive
+        property alias turboBoostSensorActive: nestedMenuContainer.turboBoostSensorActive
+        property alias oilPressureSensorActive: nestedMenuContainer.oilPressureSensorActive
+        property alias perfShiftActive: nestedMenuContainer.perfShiftActive
+
+        property alias serviceOilKm: mainWindow.serviceOilKm
+        property alias serviceBrakesKm: mainWindow.serviceBrakesKm
+    }
 
     // FPS-Counter
     Item {
@@ -88,8 +111,8 @@ Window {
                         alertTimeout.restart()
                     }
                 } else {
-                        mainWindow.standbyAlertTriggered = false
-                        if (mainWindow.alertMessage === mainWindow.alertStandby) {
+                    mainWindow.standbyAlertTriggered = false
+                    if (mainWindow.alertMessage === mainWindow.alertStandby) {
                         mainWindow.isAlertActive = false
                         mainWindow.isZoomed = mainWindow.wasZoomedBeforeAlert
                         alertTimeout.stop()
@@ -97,27 +120,6 @@ Window {
                 }
             }
         }
-
-        function onFuelReserveChanged(active) {
-            if (!mainWindow.testMode) {
-                if (active) {
-                    if (!mainWindow.fuelAlertTriggered && !mainWindow.isAlertActive) {
-                        mainWindow.fuelAlertTriggered = true
-                        mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
-                        mainWindow.alertMessage = mainWindow.alertFuel
-                        mainWindow.alertSubMessage = "NISKI POZIOM PALIWA"
-                        mainWindow.alertColor = "#ffaa00"
-                        mainWindow.alertIconSource = "control_lights/tank_light.png"
-                        mainWindow.isAlertActive = true
-                        mainWindow.isZoomed = true
-                        alertTimeout.restart()
-                    }
-                } else {
-                    mainWindow.fuelAlertTriggered = false
-                }
-            }
-        }
-
     }
 
     property int centerMode: 0
@@ -125,17 +127,23 @@ Window {
 
     // Themes
     property color electricBlue: "#00ccff"
+    property color volcanoOrange: "#ef7911"
     property color redLineColor: "#ff2200"
-    property color accentColor: lightTheme ? Qt.darker(electricBlue, 1.2) : electricBlue
-    // property color accentColor: lightTheme ? "#505050" : electricBlue
+    // property color accentColor: lightTheme ? Qt.darker(electricBlue, 1.2) : electricBlue
+    property color accentColor: lightTheme ? volcanoOrange : electricBlue
     property int themeMode: 0
     property bool lightTheme: themeMode === 1
 
     // Main
+
+    // Test-params
+    // property real rpm: 3000
+
     property real rpm: testMode ? 0 : canBusBackend.rpm
     property real displayedRpm: testMode ? rpm : (startupSweepActive ? sweepRpm : smoothedRpm)
     property real speed: testMode ? 0 : canBusBackend.speed
     Behavior on speed { SmoothedAnimation { velocity: 150; duration: 200 } }
+    property string currentGear: "N"
     property real totalMileage: canBusBackend.mileage
     property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
@@ -147,20 +155,108 @@ Window {
 
     // Trip-Mode
     property real fuelAmount: testMode ? 0 : canBusBackend.fuelAmount
+    // property real fuelAmount: 5
     property real rangeKm: testMode ? 0 : canBusBackend.rangeKm
     property real fuelReserveThreshold: 5.0
     property real maxFuelCapacity: 50
+
+    onFuelAmountChanged: {
+        if (!mainWindow.testMode) {
+            if (fuelAmount <= fuelReserveThreshold) {
+                if (!mainWindow.fuelAlertTriggered && !mainWindow.isAlertActive) {
+                    mainWindow.fuelAlertTriggered = true
+                    mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
+                    mainWindow.alertMessage = mainWindow.alertFuel
+                    mainWindow.alertSubMessage = "NISKI POZIOM PALIWA"
+                    mainWindow.alertColor = "#ffaa00"
+                    mainWindow.alertIconSource = "control_lights/tank_light.png"
+                    mainWindow.isAlertActive = true
+                    mainWindow.isZoomed = true
+                    alertTimeout.restart()
+                }
+            } else {
+                mainWindow.fuelAlertTriggered = false
+                if (alertMessage === alertFuel) {
+                    mainWindow.isAlertActive = false
+                    mainWindow.isZoomed = mainWindow.wasZoomedBeforeAlert
+                    alertTimeout.stop()
+                }
+            }
+        }
+    }
 
     // Turbo-Mode
     property real throttlePosition: testMode ? 0 : canBusBackend.throttle
 
     // Service-Mode
-    property real serviceBrakesKm: 0
+    property int serviceOilKm: 15000
+    property int serviceBrakesKm: 30000
     property var inspectionDate: new Date(2028, 5, 1)
+
+    readonly property int daysToInspection: {
+        var now = new Date()
+        var diffTime = inspectionDate.getTime() - now.getTime()
+        return Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    }
+
+    readonly property int oilStatus: serviceOilKm < 0 ? 2 : (serviceOOilKm <= 2000 ? 1 : 0)
+    readonly property int brakesStatus: serviceBrakesKm < 0 ? 2 : (serviceBrakesKm <= 2000 ? 1 : 0)
+    readonly property int inspectionStatus: daysToInspection < 0 ? 2 : (daysToInspection <= 30 ? 1 : 0)
+
+    function getServiceColor(status) {
+        if (status === 2) return mainWindow.redLineColor
+        if (status === 1) return "#ffaa00"
+        return mainWindow.lightTheme ? "#444444" : "#ffffff"
+    }
 
     function resetInspectionDate() {
         var currentDate = new Date()
         inspectionDate = new Date(currentDate.getFullYear() + 2, currentDate.getMonth(), 1)
+    }
+
+    function resetOilService() {
+        serviceOilKm = 15000
+    }
+
+    function resetBrakesService() {
+        serviceBrakesKm = 30000
+    }
+
+    property int _lastTrackedMileage: totalMileage
+    onTotalMileageChanged: {
+        if (_lastTrackedMileage > 0 && totalMileage > _lastTrackedMileage) {
+            var diff = totalMileage - _lastTrackedMileage
+            serviceOilKm -= diff
+            serviceBrakesKm -= diff
+        }
+        _lastTrackedMileage = totalMileage
+    }
+
+    function checkStartupServiceAlert() {
+        if (oilStatus === 2) {
+            triggerServiceAlert("WYMIEŃ OLEJ!", (serviceOilKm) + " KM", redlineColor)
+        } else if (brakesStatus === 2) {
+            triggerServiceAlert("SERWIS HAMULCÓW!", (serviceBrakesKm) + " KM", redlineColor)
+        } else if (inspectionStatus === 2) {
+            triggerServiceAlert("PRZEGLĄD!", "MINĄŁ TERMIN", redlineColor)
+        } else if (oilStatus === 1) {
+            triggerServiceAlert("SERWIS OLEJOWY", "ZA " + serviceOilKm + " KM", "#ffaa00")
+        } else if (brakesStatus === 1) {
+            triggerServiceAlert("SERWIS HAMULCOWY", "ZA " + serviceBrakesKm + " KM", "#ffaa00")
+        } else if (inspectionStatus === 1) {
+            triggerServiceAlert("PRZEGLĄD", "ZA " + daysToInspection + " DNI", "#ffaa00")
+        }
+    }
+
+    function triggerServiceAlert(msg, subMsg, alertCol) {
+        mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
+        mainWindow.alertMessage = msg
+        mainWindow.alertSubMessage = subMsg
+        mainWindow.alertColor = alertCol
+        mainWindow.alertIconSource = "control_lights/temp_light.png"
+        mainWindow.isAlertActive = true
+        mainWindow.isZoomed = true
+        alertTimeout.restart()
     }
 
     // Settings-Mode
@@ -209,6 +305,7 @@ Window {
     property bool wasZoomedBeforeAlert: false
     property int selectedSettingIndex: 0
     property bool useArcInsteadOfNeedle: !nestedMenuContainer.rpmType
+    property bool gearIndicatorActive: nestedMenuContainer.gearIndicatorActive
 
     // Alerts
     property string alertStandby: "TRYB UŚPIENIA"
@@ -239,8 +336,13 @@ Window {
         interval: 1500
         running: true
         repeat: false
-        onTriggered: { mainWindow.isBulbCheckActive = false }
-        Component.onCompleted: { mainWindow.isBulbCheckActive = true }
+        onTriggered: {
+            mainWindow.isBulbCheckActive = false
+            mainWindow.checkStartupServiceAlert()
+        }
+        Component.onCompleted: {
+            mainWindow.isBulbCheckActive = true
+        }
     }
 
     // TESTMODE
@@ -252,21 +354,28 @@ Window {
             target: mainWindow
             function onTestModeChanged() {
                 if (mainWindow.testMode) {
-                    headlightsActive = true; handbrakeActive = true; doorLeftOpen = true
-                    doorRightOpen = true; hoodOpen = true; trunkOpen = true
+                    headlightsActive = true;
+                    handbrakeActive = true;
+                    doorLeftOpen = true
+                    doorRightOpen = true;
+                    hoodOpen = true;
+                    trunkOpen = true
+
                     sweepAnimation.stop()
                     mainWindow.startupSweepActive = false
                     mainWindow.sweepRpm = 0
-
                     rpmAnimation.start()
                     speedAnimation.start()
                 } else {
-                    headlightsActive = false; handbrakeActive = false; doorLeftOpen = false
-                    doorRightOpen = false; hoodOpen = false; trunkOpen = false
+                    headlightsActive = false;
+                    handbrakeActive = false;
+                    doorLeftOpen = false
+                    doorRightOpen = false;
+                    hoodOpen = false;
+                    trunkOpen = false
 
                     rpmAnimation.stop()
                     speedAnimation.stop()
-
                     mainWindow.rpm = 0
                     mainWindow.speed = 0
                     mainWindow.sweepRpm = 0
@@ -416,6 +525,13 @@ Window {
                                 return
                             }
 
+                            if (event.key === Qt.Key_G) {
+                                var gears = ["N", "1", "2", "3", "4", "5", "6", "R"]
+                                var nextIndex = (gears.indexOf(mainWindow.currentGear) + 1) % gears.length
+                                mainWindow.currentGear = gears[nextIndex]
+                                event.accepted = true
+                            }
+
                             if (event.key === Qt.Key_F) showFps = !showFps
                             if (event.key === Qt.Key_T) testMode = !testMode
                             if (event.key === Qt.Key_Tab) infoMode = (infoMode + 1) % 5
@@ -534,7 +650,7 @@ Window {
                                      }
                                  }
                                  event.accepted = true
-                         }
+                             }
 
                              else if (event.key === Qt.Key_K) {
                                  if (btn2LongPressTimer.running) {
@@ -542,10 +658,10 @@ Window {
 
                                      if (mainWindow.isZoomed) {
                                          if (mainWindow.centerMode === 7) {
-                                            nestedMenuContainer.moveDown()
+                                             nestedMenuContainer.moveDown()
                                          } else {
-                                            mainWindow.centerMode = (mainWindow.centerMode - 1 < 0) ? 7 : (mainWindow.centerMode - 1)
-                                            mainWindow.selectedSettingIndex = 0
+                                             mainWindow.centerMode = (mainWindow.centerMode - 1 < 0) ? 7 : (mainWindow.centerMode - 1)
+                                             mainWindow.selectedSettingIndex = 0
                                          }
                                      } else {
                                          mainWindow.infoMode = (mainWindow.infoMode - 1 < 0) ? 4 : (mainWindow.infoMode - 1)
@@ -568,6 +684,7 @@ Window {
         // Szachownica
         Item {
             id: checkeredFlagLayer
+            visible: !mainWindow.lightTheme
             anchors.fill: parent; opacity: 0; z: 0.5
             Rectangle { id: dashboardMask; anchors.fill: parent; radius: 360; color: "black"; visible: false }
             Item {
@@ -596,7 +713,14 @@ Window {
                 anchors.fill: parent;
                 antialiasing: true;
                 renderTarget: Canvas.Image
-                visible: true
+                visible: !mainWindow.lightTheme
+
+                Connections {
+                    target: mainWindow
+                    function onLightThemeChanged() {
+                        staticTicksCanvas.requestPaint()
+                    }
+                }
 
                 onPaint: {
                     var ctx = getContext("2d")
@@ -651,7 +775,7 @@ Window {
                                 return mainWindow.redLineColor;
                             }
                             if (mainWindow.lightTheme) {
-                                return headlightsActive ? "#EF7911" : "#474747";
+                                return headlightsActive ? volcanoOrange : "#474747";
                             }
                             return headlightsActive ? "#ffffff" : "#474747";
                         }
@@ -693,12 +817,22 @@ Window {
 
             Canvas {
                 id: rpmArcCanvas
-                anchors.fill: parent; antialiasing: true
-                visible: true
+                anchors.fill: parent;
+                antialiasing: true
+                opacity: (!mainWindow.lightTheme) ? 1.0 : 0.0
+                visible: opacity > 0
 
                 Connections {
                     target: mainWindow
-                    function onDisplayedRpmChanged() { rpmArcCanvas.requestPaint() }
+                    enabled: rpmArcCanvas.visible
+                    function onDisplayedRpmChanged() {
+                        if (rpmArcCanvas.visible) rpmArcCanvas.requestPaint()
+                    }
+                    function onLightThemeChanged() { rpmArcCanvas.requestPaint() }
+                }
+
+                onVisibleChanged: {
+                    if (visible) requestPaint()
                 }
 
                 onPaint: {
@@ -739,52 +873,66 @@ Window {
 
         // Numbers on Cluster
         Item {
-            id: numbersLayer;
-            anchors.fill: parent;
+            id: numbersLayer
+            anchors.fill: parent
             z: 5
             scale: mainWindow.isZoomed ? 0.5 : 1.0
 
             Repeater {
                 model: 9
                 Item {
-                    width: 1;
-                    height: 1;
+                    width: 1
+                    height: 1
                     anchors.centerIn: parent
                     rotation: -110 + (index * 27.5)
 
                     Text {
-                        id: rpmDigit;
-                        text: index;
+                        id: rpmDigit
+                        text: index
                         y: mainWindow.isZoomed ? -573 : -295
                         anchors.horizontalCenter: parent.horizontalCenter
-                        font.family: miniFont.name;
-                        font.pixelSize: mainWindow.isZoomed ? 55 : 47;
+                        font.family: miniFont.name
+                        font.pixelSize: mainWindow.isZoomed ? 55 : 47
                         font.bold: true
                         visible: !(index === 4 && mainWindow.isZoomed && topOuterWarningLights.activeLights.length > 0)
+
                         renderType: Text.QtRendering
-                        smooth: false
+                        smooth: true
+                        antialiasing: true
 
                         property bool isReached: mainWindow.displayedRpm >= (index * 1000)
+
+                        style: mainWindow.lightTheme ? Text.Outline : (isReached ? Text.Outline : Text.Normal)
+                        styleColor: {
+                            if (mainWindow.lightTheme) {
+                                return isReached ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.35);
+                            }
+                            return isReached ? Qt.rgba(0, 0, 0, 0.9) : "transparent";
+                        }
+
                         color: {
                             if (index === 7 || index === 8) {
-                                return isReached ? mainWindow.redLineColor : Qt.rgba(1, 0.3, 0.3, 0.8)
+                                return isReached ? mainWindow.redLineColor : Qt.rgba(1, 0.25, 0.25, 0.85);
                             }
+
                             if (!headlightsActive) {
-                                return "#505050";
+                                return mainWindow.lightTheme ? "#1b1b1b" : "#4a4a4a";
                             }
                             else {
                                 if (mainWindow.lightTheme) {
-                                    return "#EF7911";
-                                }
-                                else {
-                                    return "#ffffff";
+                                    return isReached ? "#d46200" : volcanoOrange;
+                                } else {
+                                    return isReached ? mainWindow.electricBlue : "#ffffff";
                                 }
                             }
                         }
-                        scale: isReached ? 1.20 : 1.0
+
+                        scale: isReached ? 1.22 : 1.0
+
                         Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on styleColor { ColorAnimation { duration: 150 } }
                         Behavior on y { NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
-                        Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
                     }
                 }
             }
@@ -795,7 +943,7 @@ Window {
             id: rpmPieArcCanvas
             anchors.fill: parent
             z: 0
-            visible: mainWindow.useArcInsteadOfNeedle
+            visible: mainWindow.useArcInsteadOfNeedle && !mainWindow.lightTheme
             antialiasing: true
 
             onPaint: {
@@ -828,7 +976,53 @@ Window {
 
             Connections {
                 target: mainWindow
-                function onDisplayedRpmChanged() { rpmPieArcCanvas.requestPaint() }
+                function onDisplayedRpmChanged() {
+                    if (rpmPieArcCanvas.visible) rpmPieArcCanvas.requestPaint()
+                }
+                function onLightThemeChanged() {
+                    rpmPieArcCanvas.requestPaint()
+                }
+            }
+        }
+
+        Rectangle {
+            id: gearIndicator
+            z: 25
+            width: mainWindow.isZoomed ? 48 : 56
+            height: width
+            radius: width / 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: mainWindow.isZoomed ? 160 : -190
+            color: mainWindow.lightTheme ? "#2a2a2a" : "#0d0d0d"
+            border.width: 2
+            border.color: {
+                if (mainWindow.currentGear === "R") return mainWindow.redLineColor
+                if (mainWindow.currentGear === "N") return "#555555"
+                return mainWindow.accentColor
+            }
+
+            Behavior on border.color { ColorAnimation { duration: 150 } }
+            Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
+            Behavior on anchors.verticalCenterOffset { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
+
+            opacity: (nestedMenuContainer.gearIndicatorActive && !mainWindow.isAlertActive && (!mainWindow.isZoomed || mainWindow.centerMode === 0)) ? 1.0 : 0.0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 250 } }
+
+            Text {
+                id: gearText
+                anchors.centerIn: parent
+                text: mainWindow.currentGear
+                font.family: miniFont.name
+                font.pixelSize: gearIndicator.width * 0.58
+                font.bold: true
+                color: {
+                    if (mainWindow.currentGear === "R") return mainWindow.redLineColor
+                    if (mainWindow.currentGear === "N") return "#888888"
+                    return mainWindow.lightTheme ? "#ffffff" : mainWindow.electricBlue
+                }
+                Behavior on color { ColorAnimation { duration: 150 } }
             }
         }
 
@@ -843,9 +1037,12 @@ Window {
             rotation: -110 + (displayedRpm / 8000) * 220
             visible: true
 
-            property color needleColor: (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive)
-                                        ? mainWindow.redLineColor
-                                        : mainWindow.electricBlue
+            property color needleColor: {
+                if (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive) {
+                    return mainWindow.redLineColor;
+                }
+                return mainWindow.lightTheme ? volcanoOrange : electricBlue;
+            }
 
             // Glow
             Shape {
@@ -994,7 +1191,7 @@ Window {
                 anchors.fill: parent
                 property color currentBorderColor: (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive)
                                                    ? mainWindow.redLineColor
-                                                   : (mainWindow.lightTheme ? "#EF7911" : Qt.darker(mainWindow.accentColor, 1.2))
+                                                   : (mainWindow.lightTheme ? volcanoOrange : Qt.darker(mainWindow.accentColor, 1.2))
 
                 Item {
                     anchors.fill: parent
@@ -1022,12 +1219,20 @@ Window {
                         border.color: hardwareRotatedShape.currentBorderColor
                         antialiasing: true
 
+                        /*
                         gradient: Gradient {
                             // GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#ffffff" : "#141414" }
-                            GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#505050" : "#141414" }
+                            GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#cccccc" : "#141414" }
 
                             // GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#e4e4e4" : "#050505" }
                             GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#505050" : "#050505" }
+                        }
+                        */
+
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: mainWindow.lightTheme ? "#f7f9fa" : "#141414" }
+                            GradientStop { position: 0.7; color: mainWindow.lightTheme ? "#e2e6ea" : "#0d0d0d" }
+                            GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#cfd4da" : "#050505" }
                         }
 
                         Rectangle {
@@ -1083,56 +1288,79 @@ Window {
             // Fuel Arc
             Shape {
                 anchors.fill: parent
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowBlur: 1.5
-                    shadowColor: mainWindow.fuelAmount < 10 ? mainWindow.redLineColor : "#ffaa00"
-                }
+                antialiasing: true
+                smooth: true
+                preferredRendererType: Shape.CurveRenderer
 
-                Shape {
-                    anchors.fill: parent
-                    ShapePath {
-                        strokeWidth: 6
-                        strokeColor: mainWindow.lightTheme ? "#000000" : "#ffffff"
-                        startX: centerDisplay.r + (centerDisplay.r) * Math.cos(90 * Math.PI / 180)
-                        startY: centerDisplay.r + (centerDisplay.r - 12.5) * Math.sin(90 * Math.PI / 180)
+                /*
+                // Biały znacznik
+                ShapePath {
+                    strokeWidth: 6
+                    strokeColor: mainWindow.lightTheme ? "#000000" : "#ffffff"
+                    startX: centerDisplay.r + (centerDisplay.r) * Math.cos(90 * Math.PI / 180)
+                    startY: centerDisplay.r + (centerDisplay.r - 12.5) * Math.sin(90 * Math.PI / 180)
 
-                        PathLine {
-                            x: centerDisplay.r + (centerDisplay.r) * Math.cos(90 * Math.PI / 180)
-                            y: centerDisplay.r + (centerDisplay.r + 2.5) * Math.sin(90 * Math.PI / 180)
-                        }
+                    PathLine {
+                        x: centerDisplay.r + (centerDisplay.r) * Math.cos(90 * Math.PI / 180)
+                        y: centerDisplay.r + (centerDisplay.r + 2.5) * Math.sin(90 * Math.PI / 180)
                     }
                 }
+                */
 
+                // Ciemne tło łuku
                 ShapePath {
                     fillColor: "transparent"
                     strokeColor: mainWindow.lightTheme ? "#e0e0e0" : "#111111"
-                    strokeWidth: 18
+                    strokeWidth: 13
                     capStyle: ShapePath.RoundCap
 
                     PathAngleArc {
                         centerX: centerDisplay.r
                         centerY: centerDisplay.r
-                        radiusX: centerDisplay.r - 5
-                        radiusY: centerDisplay.r - 5
+                        radiusX: centerDisplay.r - 4
+                        radiusY: centerDisplay.r - 4
                         startAngle: 130
                         sweepAngle: -80
                     }
                 }
+            }
+
+            // Fuel Arc
+            Shape {
+                anchors.fill: parent
+                antialiasing: true
+                smooth: true
+                preferredRendererType: Shape.CurveRenderer
+
+                layer.enabled: true
+                layer.smooth: true
+                layer.samples: 8
+
+                layer.effect: MultiEffect {
+                    shadowEnabled: true
+                    shadowBlur: 1.5
+                    shadowColor: mainWindow.fuelAmount < 4 ? mainWindow.redLineColor : "#ffaa00"
+                }
 
                 ShapePath {
-                    fillColor: "transparent";
-                    strokeColor: mainWindow.fuelAmount < 10 ? '#ff0000' : '#ffaa00';
-                    strokeWidth: 18;
+                    fillColor: "transparent"
+                    strokeColor: mainWindow.fuelAmount < 4 ? mainWindow.redLineColor : '#ffaa00'
+                    strokeWidth: 8
                     capStyle: ShapePath.RoundCap
+
                     Behavior on strokeColor { ColorAnimation { duration: 300 } }
+
                     PathAngleArc {
-                        centerX: centerDisplay.r;
-                        centerY: centerDisplay.r;
-                        radiusX: centerDisplay.r - 5;
-                        radiusY: centerDisplay.r - 5;
-                        startAngle: 120;
-                        sweepAngle: -60 * (mainWindow.fuelAmount / mainWindow.maxFuelCapacity)
+                        centerX: centerDisplay.r
+                        centerY: centerDisplay.r
+                        radiusX: centerDisplay.r - 4
+                        radiusY: centerDisplay.r - 4
+                        startAngle: 130
+                        sweepAngle: -80 * Math.max(0.001, Math.min(1.0, mainWindow.fuelAmount / mainWindow.maxFuelCapacity))
+
+                        Behavior on sweepAngle {
+                            SmoothedAnimation { velocity: 60; duration: 250 }
+                        }
                     }
                 }
             }
@@ -1143,15 +1371,15 @@ Window {
                 font.family: miniFont.name
                 font.pixelSize: isZoomed ? 15 : 30
                 font.bold: true
-                x: centerDisplay.r - 20 + (centerDisplay.r) * Math.cos(120 * Math.PI / 180) - width/2
-                y: isZoomed ? centerDisplay.r - 25 + (centerDisplay.r - 25) * Math.sin(120 * Math.PI / 180) - height/2 : centerDisplay.r - 45 + (centerDisplay.r - 25) * Math.sin(120 * Math.PI / 180) - height/2
+                x: centerDisplay.r - 35 + (centerDisplay.r) * Math.cos(120 * Math.PI / 180) - width/2
+                y: isZoomed ? centerDisplay.r - 30 + (centerDisplay.r - 25) * Math.sin(120 * Math.PI / 180) - height/2 : centerDisplay.r - 45 + (centerDisplay.r - 25) * Math.sin(120 * Math.PI / 180) - height/2
             }
 
             Item {
                 width: 45;
                 height: 45;
                 x: centerDisplay.r - width/2;
-                y: centerDisplay.r - 30 + (centerDisplay.r - 25) - height/2
+                y: centerDisplay.r - 15 + (centerDisplay.r - 25) - height/2
                 visible: !mainWindow.isZoomed
                 Image {
                     id: smallFuelIcon;
@@ -1173,8 +1401,8 @@ Window {
                 font.family: miniFont.name;
                 font.pixelSize: isZoomed ? 15 : 30
                 font.bold: true;
-                x: centerDisplay.r + 20 + (centerDisplay.r - 15) * Math.cos(60 * Math.PI / 180) - width/2;
-                y: isZoomed ? centerDisplay.r - 25 + (centerDisplay.r - 25) * Math.sin(60 * Math.PI / 180) - height/2 : centerDisplay.r - 45 + (centerDisplay.r - 25) * Math.sin(60 * Math.PI / 180) - height/2
+                x: centerDisplay.r + 35 + (centerDisplay.r - 15) * Math.cos(60 * Math.PI / 180) - width/2;
+                y: isZoomed ? centerDisplay.r - 30 + (centerDisplay.r - 25) * Math.sin(60 * Math.PI / 180) - height/2 : centerDisplay.r - 45 + (centerDisplay.r - 25) * Math.sin(60 * Math.PI / 180) - height/2
             }
 
 
@@ -1284,13 +1512,30 @@ Window {
                 spacing: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? -22 : -7) : 3
 
                 Text {
+                    id: speedValueText
                     text: Math.floor(mainWindow.speed);
-                    color: mainWindow.lightTheme ? "black" : "white";
+                    color: mainWindow.lightTheme ? volcanoOrange : "white";
                     font.family: miniFont.name;
                     font.bold: true;
                     anchors.horizontalCenter: parent.horizontalCenter;
                     font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 150 : 72) : 140;
                     topPadding: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 30 : -30) : -10;
+
+                    antialiasing: true
+                    smooth: true
+                    renderType: Text.CurveRenderer
+                    layer.enabled: true
+                    layer.samples: 8
+                    layer.smooth: true
+
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
+                        shadowBlur: 0.35
+                        shadowHorizontalOffset: 2
+                        shadowVerticalOffset: 4
+                        shadowOpacity: 1.0
+                    }
 
                     Behavior on font.pixelSize {
                         NumberAnimation {
@@ -1306,7 +1551,11 @@ Window {
                     }
                 }
                 Text {
-                    text: "KM/H"; color: mainWindow.displayedRpm >= 6750 ? mainWindow.redLineColor : mainWindow.accentColor; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; font.family: "Michroma"
+                    text: "KM/H";
+                    color: mainWindow.lightTheme ? volcanoOrange : electricBlue;
+                    font.bold: true;
+                    anchors.horizontalCenter: parent.horizontalCenter;
+                    font.family: "Michroma"
                     font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 32 : 17) : 30;
                     visible: (mainWindow.isZoomed && mainWindow.centerMode !== 0) ? 0.0 : 1.0;
                     transform: Translate {
@@ -1319,7 +1568,33 @@ Window {
                     Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
                     Behavior on opacity { NumberAnimation { duration: 300 } }
                 }
-                Text { text: (mainWindow.startupSweepActive ? 0 : Math.floor(mainWindow.displayedRpm)) + " RPM"; color: mainWindow.accentColor; font.family: miniFont.name; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: 30; opacity: (mainWindow.isZoomed && mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: 300 } } }
+                Text {
+                    text: (mainWindow.startupSweepActive ? 0 : Math.floor(mainWindow.displayedRpm)) + " RPM";
+                    color: mainWindow.accentColor;
+                    font.family: miniFont.name;
+                    font.bold: true;
+                    anchors.horizontalCenter: parent.horizontalCenter;
+                    font.pixelSize: 30;
+                    opacity: (mainWindow.isZoomed && mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 1 : 0;
+                    visible: opacity > 0;
+
+                    antialiasing: true
+                    smooth: true
+                    renderType: Text.CurveRenderer
+                    layer.enabled: true
+                    layer.samples: 8
+                    layer.smooth: true
+
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
+                        shadowBlur: 0.25
+                        shadowHorizontalOffset: 1
+                        shadowVerticalOffset: 2
+                        shadowOpacity: 1.0
+                    }
+
+                    Behavior on opacity { NumberAnimation { duration: 300 } } }
             }
 
             // Modes
@@ -1371,6 +1646,7 @@ Window {
             }
 
             InspectionMode {
+                lightTheme: mainWindow.lightTheme
                 serviceOilKm: mainWindow.serviceOilKm
                 serviceBrakesKm: mainWindow.serviceBrakesKm
                 inspectionDate: mainWindow.inspectionDate
@@ -1409,9 +1685,21 @@ Window {
                     if (mainWindow.hasOwnProperty("rangeKm")) mainWindow.rangeKm = 0
                     nestedMenuContainer.exitSubMenu()
                 }
+                onConsumptionReset: {
+                    canBusBackend.resetTripConsumption()
+                    nestedMenuContainer.exitSubMenu()
+                }
                 onLogoChanged: (newLogo) => {
                                    mainWindow.activeLogoOption = newLogo
                                }
+                onOilReset: {
+                    mainWindow.resetOilService()
+                    nestedMenuContainer.exitSubMenu()
+                }
+                onBrakesReset: {
+                    mainWindow.resetBrakesService()
+                    nestedMenuContainer.exitSubMenu()
+                }
                 onInspectionReset: {
                     mainWindow.resetInspectionDate()
                     nestedMenuContainer.exitSubMenu()
@@ -1438,6 +1726,7 @@ Window {
         LcdPanel {
             id: bottomLcdDisplay
             isZoomed: mainWindow.isZoomed
+            lightTheme: mainWindow.lightTheme
             infoMode: mainWindow.infoMode
             outdoorTemp: mainWindow.outdoorTemp
             fuelAmount: mainWindow.fuelAmount

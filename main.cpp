@@ -8,6 +8,8 @@ using namespace Qt::StringLiterals;
 
 int main(int argc, char *argv[])
 {
+    QCoreApplication::setOrganizationDomain("MiniDiDash");
+    QCoreApplication::setApplicationName("MiniDiDash");
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
     CanBusBackend canBackend;
