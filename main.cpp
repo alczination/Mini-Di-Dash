@@ -2,7 +2,9 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QQmlContext>
+
 #include "CanBusBackend.h"
+#include "UltrasonicBackend.h"
 
 using namespace Qt::StringLiterals;
 
@@ -10,10 +12,14 @@ int main(int argc, char *argv[])
 {
     QCoreApplication::setOrganizationDomain("MiniDiDash");
     QCoreApplication::setApplicationName("MiniDiDash");
+
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
+
     CanBusBackend canBackend;
+    UltrasonicBackend ultrasonicBackend;
     engine.rootContext()->setContextProperty("canBusBackend", &canBackend);
+    engine.rootContext()->setContextProperty("ultrasonicBackend", &ultrasonicBackend);
 
     const QUrl url(QStringLiteral("qrc:/MiniDashboard/Main.qml"));
     engine.load(url);

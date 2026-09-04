@@ -1,7 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
-cmake_minimum_required(VERSION 3.16)
 
 project(MiniDashboard VERSION 0.1 LANGUAGES CXX)
 
@@ -14,8 +15,9 @@ qt_standard_project_setup()
 
 qt_add_executable(appMiniDashboard
     main.cpp
-
     CanBusBackend.h
+    UltrasonicBackend.h
+    UltrasonicBackend.cpp
 )
 
 qt_add_qml_module(appMiniDashboard
@@ -56,13 +58,11 @@ qt_add_qml_module(appMiniDashboard
         control_lights/turbo_symbol.png
         control_lights/gas_symbol.png
         control_lights/intake_symbol.png
-        SOURCES
-        SOURCES
 )
 
 target_include_directories(appMiniDashboard PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR} # To kieruje kompilator bezpośrednio do folderu build
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 target_link_libraries(appMiniDashboard
@@ -71,6 +71,12 @@ target_link_libraries(appMiniDashboard
         Qt6::QuickControls2
         Qt6::Network
 )
+
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GPIOD REQUIRED libgpiod)
+    target_link_libraries(appMiniDashboard PRIVATE ${GPIOD_LIBRARIES})
+endif()
 
 include(GNUInstallDirs)
 install(TARGETS appMiniDashboard
