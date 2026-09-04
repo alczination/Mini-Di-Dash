@@ -143,7 +143,12 @@ Window {
     property real displayedRpm: testMode ? rpm : (startupSweepActive ? sweepRpm : smoothedRpm)
     property real speed: testMode ? 0 : canBusBackend.speed
     Behavior on speed { SmoothedAnimation { velocity: 150; duration: 200 } }
-    property string currentGear: "N"
+    property string _testManualGear: "N"
+        property bool manualGearOverride: false
+
+        property string currentGear: (testMode || manualGearOverride || typeof gearBackend === "undefined")
+                                     ? _testManualGear
+                                     : gearBackend.currentGear
     property real totalMileage: canBusBackend.mileage
     property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
@@ -526,9 +531,10 @@ Window {
                             }
 
                             if (event.key === Qt.Key_G) {
+                                mainWindow.manualGearOverride = true;
                                 var gears = ["N", "1", "2", "3", "4", "5", "6", "R"]
-                                var nextIndex = (gears.indexOf(mainWindow.currentGear) + 1) % gears.length
-                                mainWindow.currentGear = gears[nextIndex]
+                                var nextIndex = (gears.indexOf(mainWindow._testManualGear) + 1) % gears.length
+                                mainWindow._testManualGear = gears[nextIndex]
                                 event.accepted = true
                             }
 

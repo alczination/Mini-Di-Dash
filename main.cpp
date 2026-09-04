@@ -5,6 +5,7 @@
 
 #include "CanBusBackend.h"
 #include "UltrasonicBackend.h"
+#include "GearBackend.h"
 
 using namespace Qt::StringLiterals;
 
@@ -18,8 +19,10 @@ int main(int argc, char *argv[])
 
     CanBusBackend canBackend;
     UltrasonicBackend ultrasonicBackend;
+    GearBackend gearBackend;
     engine.rootContext()->setContextProperty("canBusBackend", &canBackend);
     engine.rootContext()->setContextProperty("ultrasonicBackend", &ultrasonicBackend);
+    engine.rootContext()->setContextProperty("gearBackend", &gearBackend);
 
     const QUrl url(QStringLiteral("qrc:/MiniDashboard/Main.qml"));
     engine.load(url);
