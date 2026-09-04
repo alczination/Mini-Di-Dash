@@ -8,7 +8,7 @@
 class GearWorker : public QThread {
     Q_OBJECT
 public:
-    explicit GearWorker(int gear1Pin = 17, int gear2Pin = 27, QObject *parent = nullptr);
+    explicit GearWorker(int gear1Pin = 6, int gear2Pin = 5, QObject *parent = nullptr);
     ~GearWorker() override;
     void stop();
 

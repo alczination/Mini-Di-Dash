@@ -82,7 +82,7 @@ void GearWorker::run() {
 }
 
 GearBackend::GearBackend(QObject *parent) : QObject(parent) {
-    m_worker = new GearWorker(17, 27, this);
+    m_worker = new GearWorker(6, 5, this);
     connect(m_worker, &GearWorker::gearChanged, this, &GearBackend::onGearUpdated);
     m_worker->start();
 }
