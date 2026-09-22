@@ -16,6 +16,7 @@ qt_standard_project_setup()
 qt_add_executable(appMiniDashboard
     main.cpp
     CanBusBackend.h
+    CanBusBackend.cpp
     UltrasonicBackend.h
     UltrasonicBackend.cpp
     GearBackend.h
@@ -62,6 +63,7 @@ qt_add_qml_module(appMiniDashboard
         control_lights/intake_symbol.png
         SOURCES GearBackend.h
         SOURCES GearBackend.cpp
+        SOURCES CanBusBackend.cpp
 )
 
 target_include_directories(appMiniDashboard PRIVATE

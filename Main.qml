@@ -18,7 +18,8 @@ Window {
         // property alias fuelAmount: mainWindow.fuelAmount
         property alias rangeKm: mainWindow.rangeKm
         property alias themeMode: mainWindow.themeMode
-        property alias activelogoOption: mainWindow.activeLogoOption
+        property alias activeColorOption: mainWindow.activeColorOption
+        property alias activeLogoOption: mainWindow.activeLogoOption
 
         property alias rpmType: nestedMenuContainer.rpmType
         property alias gaugeSweepActive: nestedMenuContainer.gaugeSweepActive
@@ -90,6 +91,18 @@ Window {
             }
         }
         */
+        function onLeftBlinkerChanged() {
+            if (!mainWindow.testMode) {
+                mainWindow.leftBlinkerActive = canBusBackend.leftBlinker
+            }
+        }
+
+        function onRightBlinkerChanged() {
+            if (!mainWindow.testMode) {
+                mainWindow.rightBlinkerActive = canBusBackend.rightBlinker
+            }
+        }
+
         function onLightsStatusChanged() {
             if (!mainWindow.testMode) {
                 mainWindow.headlightsActive = canBusBackend.headlightsActive
@@ -99,6 +112,7 @@ Window {
         function onIsSleepingChanged() {
             if (!mainWindow.testMode) {
                 if (canBusBackend.isSleeping) {
+                    mainWindow.fuelAlertShownThisTrip = false
                     if (!mainWindow.standbyAlertTriggered && !mainWindow.isAlertActive) {
                         mainWindow.standbyAlertTriggered = true
                         mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
@@ -125,12 +139,43 @@ Window {
     property int centerMode: 0
     readonly property var modeNames: ["OSIĄGI", "SILNIK", "TRIP", "TURBO", "INSPEKCJA", "PARK", "OPONY", "USTAWIENIA"]
 
+    /*
+    readonly property var allModesDefintion: [
+    { id: 0, name: "OSIĄGI" },
+    { id: 1, name: "SILNIK" },
+    { id: 2, name: "TRIP" },
+    { id: 3, name: "TURBO" },
+    { id: 4, name: "INSPEKCJA" },
+    { id: 5, name: "PARK", conditional: true },
+    { id: 6, name: "OPONY" },
+    { id: 7, name: "USTAWIENIA" }
+    ]
+
+    readonly property var availableModes: {
+        var list = []
+        for (var i = 0; i < allModesDefintion.length; i++) {
+            var m = allModesDefintion
+        }
+    }
+    */
+
+
     // Themes
     property color electricBlue: "#00ccff"
     property color volcanoOrange: "#ef7911"
     property color redLineColor: "#ff2200"
     // property color accentColor: lightTheme ? Qt.darker(electricBlue, 1.2) : electricBlue
     property color accentColor: lightTheme ? volcanoOrange : electricBlue
+    property string activeColorOption: "NIEBIESKI"
+    property color customAccentColor: {
+        switch (activeColorOption) {
+        case "NIEBIESKI": return "#00ccff"
+        case "VOLCANO": return "#ef7911"
+        case "BIAŁY": return "#ffffff"
+        default: return lightTheme ? volcanoOrange : electricBlue
+        }
+    }
+
     property int themeMode: 0
     property bool lightTheme: themeMode === 1
 
@@ -140,18 +185,18 @@ Window {
     // property real rpm: 3000
 
     property real rpm: testMode ? 0 : canBusBackend.rpm
-    property real displayedRpm: testMode ? rpm : (startupSweepActive ? sweepRpm : smoothedRpm)
+    property real displayedRpm: testMode ? rpm : (startupSweepActive ? sweepRpm : (rpm === 0 ? 0 : smoothedRpm))
     property real speed: testMode ? 0 : canBusBackend.speed
     Behavior on speed { SmoothedAnimation { velocity: 150; duration: 200 } }
     property string _testManualGear: "N"
-        property bool manualGearOverride: false
-
-        property string currentGear: (testMode || manualGearOverride || typeof gearBackend === "undefined")
+    property bool manualGearOverride: false
+    property string currentGear: (testMode || manualGearOverride || typeof gearBackend === "undefined")
                                      ? _testManualGear
                                      : gearBackend.currentGear
     property real totalMileage: canBusBackend.mileage
     property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
+    property bool fuelAlertShownThisTrip: false
 
     // Engine-Mode
     property double oilTemp: testMode ? 0 : canBusBackend.oilTemp
@@ -167,19 +212,18 @@ Window {
 
     onFuelAmountChanged: {
         if (!mainWindow.testMode) {
-            if (fuelAmount <= fuelReserveThreshold) {
-                if (!mainWindow.fuelAlertTriggered && !mainWindow.isAlertActive) {
-                    mainWindow.fuelAlertTriggered = true
-                    mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
-                    mainWindow.alertMessage = mainWindow.alertFuel
-                    mainWindow.alertSubMessage = "NISKI POZIOM PALIWA"
-                    mainWindow.alertColor = "#ffaa00"
-                    mainWindow.alertIconSource = "control_lights/tank_light.png"
-                    mainWindow.isAlertActive = true
-                    mainWindow.isZoomed = true
-                    alertTimeout.restart()
+            if (fuelAmount <= fuelReserveThreshold && !mainWindow.fuelAlertShownThisTrip) {
+                mainWindow.fuelAlertShownThisTrip = true
+                mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
+                mainWindow.alertMessage = mainWindow.alertFuel
+                mainWindow.alertSubMessage = "NISKI POZIOM PALIWA"
+                mainWindow.alertColor = "#ffaa00"
+                mainWindow.alertIconSource = "control_lights/tank_light.png"
+                mainWindow.isAlertActive = true
+                mainWindow.isZoomed = true
+                alertTimeout.restart()
                 }
-            } else {
+            else if (fuelAmount > fuelReserveThreshold) {
                 mainWindow.fuelAlertTriggered = false
                 if (alertMessage === alertFuel) {
                     mainWindow.isAlertActive = false
@@ -204,7 +248,7 @@ Window {
         return Math.floor(diffTime / (1000 * 60 * 60 * 24))
     }
 
-    readonly property int oilStatus: serviceOilKm < 0 ? 2 : (serviceOOilKm <= 2000 ? 1 : 0)
+    readonly property int oilStatus: serviceOilKm < 0 ? 2 : (serviceOilKm <= 2000 ? 1 : 0)
     readonly property int brakesStatus: serviceBrakesKm < 0 ? 2 : (serviceBrakesKm <= 2000 ? 1 : 0)
     readonly property int inspectionStatus: daysToInspection < 0 ? 2 : (daysToInspection <= 30 ? 1 : 0)
 
@@ -276,9 +320,9 @@ Window {
 
     // Blinkers
     property bool headlightsActive: canBusBackend.headlightsActive
-    // property bool leftBlinkerActive: false
-    // property bool rightBlinkerActive: false
-    // property bool blinkState: false
+    property bool leftBlinkerActive: canBusBackend.leftBlinker
+    property bool rightBlinkerActive: canBusBackend.rightBlinker
+    property bool blinkState: true
 
     // Doors and Hood
     property bool doorLeftOpen: canBusBackend.doorLeft
@@ -424,11 +468,11 @@ Window {
     }
 
     Behavior on smoothedRpm {
-        SmoothedAnimation {
-            velocity: 1200;
-            duration: 250
+            NumberAnimation {
+                duration: mainWindow.rpm === 0 ? 150 : 100 // Szybki opad przy 0 RPM
+                easing.type: mainWindow.rpm === 0 ? Easing.InQuad : Easing.OutQuad
+            }
         }
-    }
 
     SequentialAnimation {
         id: sweepAnimation
@@ -771,7 +815,7 @@ Window {
 
                     Rectangle {
                         width: isMajorTick ? 9 : 5
-                        height: isMajorTick ? 50 : 22
+                        height: isMajorTick ? 50 : 18
                         y: mainWindow.lightTheme ? 8 : 17
                         anchors.horizontalCenter: parent.horizontalCenter
                         radius: 1
@@ -848,7 +892,7 @@ Window {
                     ctx.mozImageSmoothingEnabled = false
 
                     ctx.lineWidth = 20; ctx.lineCap = "butt"
-                    ctx.strokeStyle = (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive) ? mainWindow.redLineColor : mainWindow.accentColor
+                    ctx.strokeStyle = (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive) ? mainWindow.redLineColor : mainWindow.customAccentColor
                     var startAngleInDegrees = 160
                     var startRad = startAngleInDegrees * Math.PI / 180
                     var sweepAngleInDegrees = (mainWindow.displayedRpm / 8000) * 220
@@ -928,7 +972,7 @@ Window {
                                 if (mainWindow.lightTheme) {
                                     return isReached ? "#d46200" : volcanoOrange;
                                 } else {
-                                    return isReached ? mainWindow.electricBlue : "#ffffff";
+                                    mainWindow.customAccentColor;
                                 }
                             }
                         }
@@ -1047,7 +1091,7 @@ Window {
                 if (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive) {
                     return mainWindow.redLineColor;
                 }
-                return mainWindow.lightTheme ? volcanoOrange : electricBlue;
+                return mainWindow.customAccentColor;
             }
 
             // Glow
@@ -1197,7 +1241,7 @@ Window {
                 anchors.fill: parent
                 property color currentBorderColor: (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive)
                                                    ? mainWindow.redLineColor
-                                                   : (mainWindow.lightTheme ? volcanoOrange : Qt.darker(mainWindow.accentColor, 1.2))
+                                                   : mainWindow.customAccentColor
 
                 Item {
                     anchors.fill: parent
@@ -1558,7 +1602,7 @@ Window {
                 }
                 Text {
                     text: "KM/H";
-                    color: mainWindow.lightTheme ? volcanoOrange : electricBlue;
+                    color: mainWindow.lightTheme ? volcanoOrange : mainWindow.customAccentColor;
                     font.bold: true;
                     anchors.horizontalCenter: parent.horizontalCenter;
                     font.family: "Michroma"
@@ -1682,6 +1726,7 @@ Window {
                 lightTheme: mainWindow.lightTheme
                 electricBlue: mainWindow.electricBlue
                 fontName: miniFont.name
+                activeLogo: mainWindow.activeLogoOption
 
                 // Nasłuchiwanie akcji z wnętrza menu
                 onThemeChanged: mainWindow.themeMode = (mainWindow.themeMode + 1) % 2
@@ -1695,6 +1740,10 @@ Window {
                     canBusBackend.resetTripConsumption()
                     nestedMenuContainer.exitSubMenu()
                 }
+                onColorChanged: (newColor) => {
+                                    mainWindow.activeColorOption = newColor
+                                }
+
                 onLogoChanged: (newLogo) => {
                                    mainWindow.activeLogoOption = newLogo
                                }

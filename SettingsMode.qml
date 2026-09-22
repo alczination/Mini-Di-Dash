@@ -19,10 +19,13 @@ ListView {
     property string fontName: "Michroma"
 
     property string currentTheme: lightTheme ? "JASNY" : "CIEMNY"
+    readonly property var colorOptions: ["NIEBIESKI", "VOLCANO", "BIAŁY"]
+    property int currentColorIndex: 0
     property bool rpmType : true
     property bool gaugeSweepActive: true
+    property string activeLogo: "MINI"
     readonly property var logoOptions: ["MINI", "COOPER S", "MODERN", "BRAK"]
-    property int currentLogoIndex: 0
+    property int currentLogoIndex: logoOptions.indexOf(backend.currentLogo) !== -1 ? logoOptions.indexOf(backend.currentLogo) : 0
 
     property bool parkingAssistant: false
     property bool turboBoostSensorActive: true
@@ -34,6 +37,7 @@ ListView {
     property bool showFps: false
 
     signal themeChanged()
+    signal colorChanged(string newColor)
     signal fpsToggled()
     signal logoChanged(string newLogo)
 
@@ -48,6 +52,13 @@ ListView {
     model: mainCategoriesModel
     clip: true
     spacing: 6
+
+    onActiveLogoChanged: {
+        var idx = logoOptions.indexOf(activeLogo);
+        if (idx !== -1) {
+            currentLogoIndex = idx;
+        }
+    }
 
     function moveUp() {
         currentIndex = (currentIndex - 1 < 0) ? maxItemsCount - 1 : currentIndex - 1;
@@ -102,19 +113,20 @@ ListView {
         ListElement { name: "USUŃ"; category: "PROFILES"; type: "action"; idNum: 2 }
         // Wygląd
         ListElement { name: "MOTYW"; category: "APP"; type: "choice"; idNum: 3 }
-        ListElement { name: "KOLOR"; category: "APP"; type: "choice"; idNum: 4 }
+        ListElement { name: "*KOLOR POD."; category: "APP"; type: "choice"; idNum: 4 }
         ListElement { name: "WSK. OBROTÓW"; category: "APP"; type: "toggle"; idNum: 5 }
         ListElement { name: "GAUGE SWEEP"; category: "APP"; type: "toggle"; idNum: 6 }
         ListElement { name: "LOGO"; category: "APP"; type: "choice"; idNum: 7 }
-        ListElement { name: "ANIMACJA STARTOWA"; category: "choice"; type: "toggle"; idNum: 8 }
-        ListElement { name: "JASNOŚĆ"; category: "APP"; type: "choice"; idNum: 9 }
+        ListElement { name: "*ANIMACJA STARTOWA"; category: "choice"; type: "toggle"; idNum: 8 }
+        ListElement { name: "*JASNOŚĆ"; category: "APP"; type: "choice"; idNum: 9 }
+        ListElement { name: "*TRYB DZIEŃ/NOC"; category: "APP"; type: "toggle"; idNum: 10 }
         // Dodatkowe systemy
         ListElement { name: "CZUJ. BIEG"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 15 }
-        ListElement { name: "AS. PARK."; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 10 }
+        ListElement { name: "*AS. PARK."; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 10 }
         ListElement { name: "CIŚN. TURBO"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 11 }
         ListElement { name: "CIŚN. OLEJ"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 12 }
-        ListElement { name: "TPMS"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 13 }
-        ListElement { name: "PERF. SHIFT"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 14 }
+        ListElement { name: "*TPMS"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 13 }
+        ListElement { name: "*PERF. SHIFT"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 14 }
         // System Check
         // ListElement { name: "ODCZYT BŁĘDÓW"; category: "DIAG"; type: "action"; idNum: 15 }
         // ListElement { name: "KASOWANIE BŁĘDÓW"; category: "DIAG"; type: "action"; idNum: 16 }
@@ -125,12 +137,14 @@ ListView {
         ListElement { name: "RESET HAMULCE"; category: "SERVICE"; type: "action"; idNum: 19 }
         ListElement { name: "RESET OLEJ"; category: "SERVICE"; type: "action"; idNum: 20 }
         ListElement { name: "RESET PRZEGLĄD"; category: "SERVICE"; type: "action"; idNum: 21 }
-        // ListElement { name: "RESET FILTR KAB."; category: "SERVICE"; type: "action"; idNum: 22 }
+        ListElement { name: "*RESET FILTR KAB."; category: "SERVICE"; type: "action"; idNum: 22 }
         // System
         ListElement { name: "LICZNIK FPS"; category: "SYSTEM"; type: "toggle"; idNum: 23 }
-        ListElement { name: "CAN-BUS"; category: "SYSTEM"; type: "status"; idNum: 24 }
-        ListElement { name: "WYŁĄCZ"; category: "SYSTEM"; type: "action"; idNum: 25 }
-        ListElement { name: "RESTART"; category: "SYSTEM"; type: "action"; idNum: 26 }
+        ListElement { name: "*CAN-BUS"; category: "SYSTEM"; type: "status"; idNum: 24 }
+        ListElement { name: "*WYŁĄCZ"; category: "SYSTEM"; type: "action"; idNum: 25 }
+        ListElement { name: "*RESTART"; category: "SYSTEM"; type: "action"; idNum: 26 }
+        ListElement { name: "*LOG CAN"; category: "SYSTEM"; type: "action"; idNum: 27 }
+        ListElement { name: "*TEMP. CPU"; category: "SYSTEM"; type: "status"; idNum: 28 }
     }
     ListModel { id: filteredOptionsModel }
 
@@ -148,6 +162,10 @@ ListView {
                 } else {
                     switch(currentItem.idNum) {
                     case 3: themeChanged(); break;
+                    case 4:
+                        currentColorIndex = (currentColorIndex + 1) % colorOptions.length;
+                        colorChanged(colorOptions[currentColorIndex]);
+                        break;
                     case 5: rpmType = !rpmType; break;
                     case 6: gaugeSweepActive = !gaugeSweepActive; break;
                     case 7:
@@ -245,7 +263,7 @@ ListView {
                     }
                     if (model.type === "choice") {
                         if (model.idNum === 3) return settingsModeRoot.lightTheme ? "JASNY" : "CIEMNY"
-                        if (model.idNum === 4) return "NIEBIESKI"
+                        if (model.idNum === 4) return settingsModeRoot.colorOptions[settingsModeRoot.currentColorIndex]
                         if (model.idNum === 5) return "IGŁA"
                         if (model.idNum === 7) return settingsModeRoot.logoOptions[settingsModeRoot.currentLogoIndex]
                         if (model.idNum === 8) return "MINI"
