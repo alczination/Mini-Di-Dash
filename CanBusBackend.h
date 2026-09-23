@@ -117,6 +117,7 @@ class CanBusBackend : public QObject
     Q_PROPERTY(bool headlightsActive READ headlightsActive NOTIFY lightsStatusChanged)
     Q_PROPERTY(bool leftBlinker READ leftBlinker NOTIFY leftBlinkerChanged)
     Q_PROPERTY(bool rightBlinker READ rightBlinker NOTIFY rightBlinkerChanged)
+    Q_PROPERTY(bool highBeam READ highBeam NOTIFY highBeamChanged)
     Q_PROPERTY(bool trunkOpen READ trunkOpen NOTIFY trunkStatusChanged)
     Q_PROPERTY(bool absWarning READ absWarning NOTIFY absWarningChanged)
     Q_PROPERTY(bool tractionWarning READ tractionWarning NOTIFY tractionWarningChanged)
@@ -152,6 +153,7 @@ public:
     bool headlightsActive() const { return m_headlightsActive; }
     bool leftBlinker() const { return m_leftBlinker; }
     bool rightBlinker() const { return m_rightBlinker; }
+    bool highBeam() const { return m_highBeam; }
     bool trunkOpen() const { return m_trunkOpen; }
     bool absWarning() const { return m_absWarning; }
     bool tractionWarning() const { return m_tractionWarning; }
@@ -178,24 +180,17 @@ public slots:
     void setDoorRight(bool dr);
     void setHoodOpen(bool ho);
     void setHeadlightsActive(bool ha);
-    void setLeftBlinker(bool b) {
-        if (m_leftBlinker != b) {
-            m_leftBlinker = b;
-            emit leftBlinkerChanged();
-        }
-
-    }
-    void setRightBlinker(bool b) {
-        if (m_rightBlinker != b) {
-            m_rightBlinker = b;
-            emit rightBlinkerChanged();
-        }
-    }
+    void setLeftBlinker(bool b);
+    void setRightBlinker(bool b);
+    void setHighBeam(bool hb);
     void setTrunkOpen(bool to);
     void setAbsWarning(bool aw);
     void setTractionWarning(bool tw);
     void setHandbrake(bool hb);
     void setCheckEngine(bool ce);
+
+    // Główny slot integrujący dane z ramki 0x61F:
+    void updateClusterLights(bool leftBlinker, bool rightBlinker, bool highBeam, bool handbrake);
 
 signals:
     void isSleepingChanged();
@@ -217,6 +212,9 @@ signals:
     void doorRightStatusChanged();
     void hoodStatusChanged();
     void lightsStatusChanged();
+    void leftBlinkerChanged();
+    void rightBlinkerChanged();
+    void highBeamChanged();
     void trunkStatusChanged();
     void absWarningChanged();
     void tractionWarningChanged();
@@ -224,9 +222,6 @@ signals:
     void checkEngineChanged();
 
     void wheelSpeedsReceived(double lf, double rf, double lr, double rr);
-    void clusterLightsReceived(bool leftBlinker, bool rightBlinker, bool highBeam, bool handbrake);
-    void leftBlinkerChanged();
-    void rightBlinkerChanged();
 
     // Sygnał wysyłany do wątku CanWorker
     void requestResetTrip();
@@ -256,6 +251,7 @@ private:
     bool m_headlightsActive = false;
     bool m_leftBlinker = false;
     bool m_rightBlinker = false;
+    bool m_highBeam = false;
     bool m_trunkOpen = false;
     bool m_absWarning = false;
     bool m_tractionWarning = false;

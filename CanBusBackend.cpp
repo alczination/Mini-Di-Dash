@@ -29,6 +29,7 @@ CanWorker::CanWorker(QObject *parent)
     m_totalConsumedLiters = settings.value("trip/consumedLiters", 0.0).toDouble();
     m_totalDistanceKm = settings.value("trip/distanceKm", 0.0).toDouble();
     m_currentLitersPerHundred = settings.value("trip/avgConsumption", 8.2).toDouble();
+
     m_rpmWatchdog = new QTimer(this);
     m_rpmWatchdog->setInterval(80);
     m_rpmWatchdog->setSingleShot(true);
@@ -200,10 +201,8 @@ void CanWorker::parseFrame(const struct can_frame &frame)
     // RPM & Ignition State
     case 0x316: {
         if (frame.can_dlc >= 4) {
-            // Sprawdzenie stanu stacyjki z bajtu 0
             uint8_t ignition_state = static_cast<uint8_t>(frame.data[0]);
             if (ignition_state == 0x00) {
-                // Zapłon wyłączony - natychmiast zerujemy RPM bez czekania na watchdog
                 emit rpmReceived(0);
                 if (m_rpmWatchdog) m_rpmWatchdog->stop();
             } else {
@@ -369,11 +368,12 @@ void CanWorker::parseFrame(const struct can_frame &frame)
 
     // Statusy: Handbrake, Hood, Lights, Outdoor Temp
     case 0x615: {
-        if (frame.can_dlc >= 2) { // Zmniejszono z 5 na 2, żeby obsłużyć stan kluczyka w pozycji R
+        if (frame.can_dlc >= 2) {
             uint8_t byte1 = static_cast<uint8_t>(frame.data[1]);
             emit lightsStatusReceived((byte1 & 0x04) != 0);
         }
         if (frame.can_dlc >= 5) {
+            uint8_t byte1 = static_cast<uint8_t>(frame.data[1]);
             uint8_t byte3 = static_cast<uint8_t>(frame.data[3]);
             uint8_t byte4 = static_cast<uint8_t>(frame.data[4]);
 
@@ -424,8 +424,8 @@ void CanWorker::parseFrame(const struct can_frame &frame)
         if (frame.can_dlc >= 4) {
             // Byte 2: Lewy kierunkowskaz i długie światła
             uint8_t b2 = static_cast<uint8_t>(frame.data[2]);
-            bool leftBlinker = (b2 & 0x40) != 0; // 0x42 zawiera bit 0x40
-            bool highBeam    = (b2 & 0x80) != 0; // 0x82 zawiera bit 0x80
+            bool leftBlinker = (b2 & 0x40) != 0;
+            bool highBeam    = (b2 & 0x80) != 0;
 
             // Byte 3: Ostrzeżenia i prawy kierunkowskaz
             uint8_t b3 = static_cast<uint8_t>(frame.data[3]);
@@ -433,15 +433,13 @@ void CanWorker::parseFrame(const struct can_frame &frame)
             bool handbrake    = (b3 & 0x02) != 0;
             bool absWarning   = (b3 & 0x04) != 0;
             bool rightBlinker = (b3 & 0x08) != 0;
-            bool oilWarning   = (b3 & 0x10) != 0;
-            bool emlWarning   = (b3 & 0x20) != 0;
-            bool dscWarning   = (b3 & 0x40) != 0; // ASC / DSC
-            bool cruiseControl = (b3 & 0x80) != 0;
+            // bool oilWarning   = (b3 & 0x10) != 0;
+            // bool emlWarning   = (b3 & 0x20) != 0;
+            bool dscWarning   = (b3 & 0x40) != 0;
+            // bool cruiseControl = (b3 & 0x80) != 0;
 
             emit clusterLightsReceived(leftBlinker, rightBlinker, highBeam, handbrake);
-            setLeftBlinker(leftBlinker);
-            setRightBlinker(rightBlinker);
-            emit checkEngineChanged(checkEngine);
+            emit engineMilStatusReceived(checkEngine);
             emit absWarningReceived(absWarning);
             emit tractionWarningReceived(dscWarning);
         }
@@ -466,6 +464,7 @@ CanBusBackend::CanBusBackend(QObject *parent)
     m_mileage(0), m_fuelReserve(false), m_avgConsumption(8.2), m_instantConsumption(0.0),
     m_throttle(0.0), m_outdoorTemp(0.0), m_doorLeft(false),
     m_doorRight(false), m_hoodOpen(false), m_headlightsActive(false),
+    m_leftBlinker(false), m_rightBlinker(false), m_highBeam(false),
     m_trunkOpen(false), m_absWarning(false), m_tractionWarning(false),
     m_handbrake(false), m_checkEngine(false)
 {
@@ -505,12 +504,10 @@ CanBusBackend::CanBusBackend(QObject *parent)
     connect(m_worker, &CanWorker::engineMilStatusReceived, this, &CanBusBackend::setCheckEngine);
     connect(this, &CanBusBackend::requestResetTrip, m_worker, &CanWorker::resetTripConsumption);
     connect(m_worker, &CanWorker::wheelSpeedsReceived, this, &CanBusBackend::wheelSpeedsReceived);
-    connect(m_worker, &CanWorker::clusterLightsReceived, this, [this](bool left, bool right, bool highBeam, bool handbrake) {
-        setLeftBlinker(left);
-        setRightBlinker(right);
-        setHeadlightsActive(highBeam);
-        setHandbrake(handbrake);
-    });
+
+    // Połączenie ramki kontrolek 0x61F ze slotem deski
+    connect(m_worker, &CanWorker::clusterLightsReceived, this, &CanBusBackend::updateClusterLights);
+
     m_workerThread.start();
 }
 
@@ -526,6 +523,14 @@ CanBusBackend::~CanBusBackend()
 void CanBusBackend::resetTripConsumption()
 {
     emit requestResetTrip();
+}
+
+void CanBusBackend::updateClusterLights(bool leftBlinker, bool rightBlinker, bool highBeam, bool handbrake)
+{
+    setLeftBlinker(leftBlinker);
+    setRightBlinker(rightBlinker);
+    setHighBeam(highBeam);
+    setHandbrake(handbrake);
 }
 
 // Setters implementation
@@ -548,6 +553,31 @@ void CanBusBackend::setDoorLeft(bool dl) { if (m_doorLeft != dl) { m_doorLeft = 
 void CanBusBackend::setDoorRight(bool dr) { if (m_doorRight != dr) { m_doorRight = dr; emit doorRightStatusChanged(); } }
 void CanBusBackend::setHoodOpen(bool ho) { if (m_hoodOpen != ho) { m_hoodOpen = ho; emit hoodStatusChanged(); } }
 void CanBusBackend::setHeadlightsActive(bool ha) { if (m_headlightsActive != ha) { m_headlightsActive = ha; emit lightsStatusChanged(); } }
+
+void CanBusBackend::setLeftBlinker(bool b)
+{
+    if (m_leftBlinker != b) {
+        m_leftBlinker = b;
+        emit leftBlinkerChanged();
+    }
+}
+
+void CanBusBackend::setRightBlinker(bool b)
+{
+    if (m_rightBlinker != b) {
+        m_rightBlinker = b;
+        emit rightBlinkerChanged();
+    }
+}
+
+void CanBusBackend::setHighBeam(bool hb)
+{
+    if (m_highBeam != hb) {
+        m_highBeam = hb;
+        emit highBeamChanged();
+    }
+}
+
 void CanBusBackend::setTrunkOpen(bool to) { if (m_trunkOpen != to) { m_trunkOpen = to; emit trunkStatusChanged(); } }
 void CanBusBackend::setAbsWarning(bool aw) { if (m_absWarning != aw) { m_absWarning = aw; emit absWarningChanged(); } }
 void CanBusBackend::setTractionWarning(bool tw) { if (m_tractionWarning != tw) { m_tractionWarning = tw; emit tractionWarningChanged(); } }

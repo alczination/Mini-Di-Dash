@@ -32,6 +32,8 @@ Window {
 
         property alias serviceOilKm: mainWindow.serviceOilKm
         property alias serviceBrakesKm: mainWindow.serviceBrakesKm
+
+        property alias infoMode: mainWindow.infoMode
     }
 
     // FPS-Counter
@@ -164,9 +166,14 @@ Window {
     property color electricBlue: "#00ccff"
     property color volcanoOrange: "#ef7911"
     property color redLineColor: "#ff2200"
-    // property color accentColor: lightTheme ? Qt.darker(electricBlue, 1.2) : electricBlue
-    property color accentColor: lightTheme ? volcanoOrange : electricBlue
-    property string activeColorOption: "NIEBIESKI"
+    property color accentColor: {
+        if (lightTheme) {
+            return volcanoOrange;
+        }
+        return (activeColorOption === "VOLCANO") ? volcanoOrange : electricBlue;
+    }
+
+    property string activeColorOption: "VOLCANO"
     property color customAccentColor: {
         switch (activeColorOption) {
         case "NIEBIESKI": return "#00ccff"
@@ -191,8 +198,8 @@ Window {
     property string _testManualGear: "N"
     property bool manualGearOverride: false
     property string currentGear: (testMode || manualGearOverride || typeof gearBackend === "undefined")
-                                     ? _testManualGear
-                                     : gearBackend.currentGear
+                                 ? _testManualGear
+                                 : gearBackend.currentGear
     property real totalMileage: canBusBackend.mileage
     property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
@@ -222,7 +229,7 @@ Window {
                 mainWindow.isAlertActive = true
                 mainWindow.isZoomed = true
                 alertTimeout.restart()
-                }
+            }
             else if (fuelAmount > fuelReserveThreshold) {
                 mainWindow.fuelAlertTriggered = false
                 if (alertMessage === alertFuel) {
@@ -359,13 +366,15 @@ Window {
     // Alerts
     property string alertStandby: "TRYB UŚPIENIA"
     property string alertFuel: "REZERWA"
-    property string alertOutsideTemp: "TEMPERATURA\nZEWNĘTRZNA"
+    property string alertOutsideTemp: "TEMPERATURA\n ZEWNĘTRZNA"
     property string alertOpenHood: "MASKA"
     property string alertOpenTrunk: "OTWARTY BAGAŻNIK"
-    property string alertEngineTemp: "TEMPERATURA\nSILNIKA"
+    property string alertOpenDoor: "OTWARTE DRZWI"
+    property string alertHandbrake: "RĘCZNY"
+    property string alertEngineTemp: "TEMP. SILNIKA"
     property string alertOilPress: "CIŚNIENIE OLEJU"
     property string alertOilSensor: "AWARIA CZUJNIKA OLEJU"
-    property string alertABS: "AWARIA\nSYSTEMU ABS"
+    property string alertABS: "AWARIA ABS"
     property string alertCheckEngine: "CHECK ENGINE"
 
     property bool fuelAlertTriggered: false
@@ -468,11 +477,11 @@ Window {
     }
 
     Behavior on smoothedRpm {
-            NumberAnimation {
-                duration: mainWindow.rpm === 0 ? 150 : 100 // Szybki opad przy 0 RPM
-                easing.type: mainWindow.rpm === 0 ? Easing.InQuad : Easing.OutQuad
-            }
+        NumberAnimation {
+            duration: mainWindow.rpm === 0 ? 150 : 100 // Szybki opad przy 0 RPM
+            easing.type: mainWindow.rpm === 0 ? Easing.InQuad : Easing.OutQuad
         }
+    }
 
     SequentialAnimation {
         id: sweepAnimation
@@ -611,6 +620,8 @@ Window {
                                     { msg: alertFuel, sub: "POZOSTAŁO 50 KM", icon: "control_lights/tank_light.png", color: "#ffaa00" },
                                     { msg: alertOutsideTemp, sub: "-10°C", icon: "control_lights/lowtempoutside_light.png", color: "#ffaa00" },
                                     { msg: alertOpenHood, sub: "SPRAWDŹ ZAMKNIĘCIE", icon: "control_lights/hoodopen_light.png", color: "#ffaa00" },
+                                    { msg: alertHandbrake, sub: "ZACIĄGNIĘTY", icon: "control_lights/handbrake_light.png", color: redLineColor },
+                                    { msg: alertOpenDoor, sub: "SPRAWDŹ DRZWI", icon: "control_lights/dooropen_light.png", color: redLineColor },
                                     { msg: alertCheckEngine, sub: "SPRAWDŹ SILNIK!", icon: "control_lights/check_light.png", color: "#ffaa00" },
                                     { msg: alertEngineTemp, sub: "ZGAŚ SILNIK", icon: "control_lights/temp_light.png", color: redLineColor },
                                     { msg: alertOilPress, sub: "WYŁĄCZ SILNIK!", icon: "control_lights/oil_light.png", color: redLineColor },
@@ -993,7 +1004,7 @@ Window {
             id: rpmPieArcCanvas
             anchors.fill: parent
             z: 0
-            visible: mainWindow.useArcInsteadOfNeedle && !mainWindow.lightTheme
+            visible: mainWindow.useArcInsteadOfNeedle
             antialiasing: true
 
             onPaint: {
@@ -1016,9 +1027,17 @@ Window {
                 ctx.closePath()
 
                 if (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive) {
-                    ctx.fillStyle = Qt.rgba(1, 0, 0, 0.45)
+                    ctx.fillStyle = Qt.rgba(mainWindow.redLineColor.r,
+                                            mainWindow.redLineColor.g,
+                                            mainWindow.redLineColor.b,
+                                            0.45)
                 } else {
-                    ctx.fillStyle = Qt.rgba(0, 0.8, 1, 0.50)
+                    // W motywie jasnym stosujemy volcanoOrange, w ciemnym electricBlue (czyli mainWindow.accentColor)
+                    // z dopasowanym poziomem przezroczystości (alpha)
+                    ctx.fillStyle = Qt.rgba(mainWindow.accentColor.r,
+                                            mainWindow.accentColor.g,
+                                            mainWindow.accentColor.b,
+                                            mainWindow.lightTheme ? 0.40 : 0.50)
                 }
 
                 ctx.fill()
@@ -1026,11 +1045,15 @@ Window {
 
             Connections {
                 target: mainWindow
+                enabled: rpmArcCanvas.visible
                 function onDisplayedRpmChanged() {
                     if (rpmPieArcCanvas.visible) rpmPieArcCanvas.requestPaint()
                 }
                 function onLightThemeChanged() {
-                    rpmPieArcCanvas.requestPaint()
+                    if (rpmPieArcCanvas.visible) rpmPieArcCanvas.requestPaint()
+                }
+                function onAccentColorChanged() {
+                    if (rpmPieArcCanvas.visible) rpmPieArcCanvas.requestPaint()
                 }
             }
         }
@@ -1804,11 +1827,12 @@ Window {
             spacing: 7;
             z: 20
             Item {
-                width: 50;
-                height: 40;
+                width: 60;
+                height: width;
                 opacity: mainWindow.checkEngine ? 1.0 : 0.0;
                 visible: opacity > 0;
                 Image {
+                    id: checkIcon
                     source: "control_lights/check_light.png";
                     anchors.centerIn: parent;
                     width: parent.width; height: width;
@@ -1816,25 +1840,36 @@ Window {
                 }
                 layer.enabled: true;
                 layer.effect: MultiEffect {
-                    shadowEnabled: true;
-                    shadowColor: "#ffaa00";
-                    shadowBlur: 0.4
+                    source: checkIcon
+                    shadowEnabled: true
+                    shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.55) : "#ffaa00"
+                    shadowBlur: mainWindow.lightTheme ? 0.2 : 0.4
+                    shadowVerticalOffset: mainWindow.lightTheme ? 1 : 0
+                    shadowHorizontalOffset: mainWindow.lightTheme ? 1 : 0
+                    contrast: mainWindow.lightTheme ? 0.15 : 0.0
+                    brightness: mainWindow.lightTheme ? -0.05 : 0.0
                 }
             }
             Item {
-                width: 50;
+                width: 60;
                 height: width;
                 opacity: mainWindow.absWarning ? 1.0 : 0.0;
                 visible: opacity > 0;
                 Image {
+                    id: absIcon
                     source: "control_lights/abs_light.png";
                     anchors.centerIn: parent;
                     width: parent.width; height: width;
                     fillMode: Image.PreserveAspectFit } layer.enabled: true;
                 layer.effect: MultiEffect {
-                    shadowEnabled: true;
-                    shadowColor: "#ff0000";
-                    shadowBlur: 0.4
+                    source: absIcon
+                    shadowEnabled: true
+                    shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.55) : "#ffaa00"
+                    shadowBlur: mainWindow.lightTheme ? 0.2 : 0.4
+                    shadowVerticalOffset: mainWindow.lightTheme ? 1 : 0
+                    shadowHorizontalOffset: mainWindow.lightTheme ? 1 : 0
+                    contrast: mainWindow.lightTheme ? 0.15 : 0.0
+                    brightness: mainWindow.lightTheme ? -0.05 : 0.0
                 }
             }
         }
@@ -1848,22 +1883,34 @@ Window {
             anchors.topMargin: mainWindow.isZoomed ? 600 : 550;
             spacing: 7; z: 20
             Item {
-                width: 50; height: width;
+                width: 60;
+                height: width;
                 opacity: mainWindow.tractionWarning ? 1.0 : 0.0;
                 visible: opacity > 0;
                 Image {
+                    id: dscLight
                     source: "control_lights/dsc_light.png";
                     anchors.centerIn: parent;
                     width: parent.width; height: width;
-                    fillMode: Image.PreserveAspectFit;
+                    fillMode: Image.PreserveAspectFit } layer.enabled: true;
+                layer.effect: MultiEffect {
+                    source: dscLight
+                    shadowEnabled: true
+                    shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.55) : "#ffaa00"
+                    shadowBlur: mainWindow.lightTheme ? 0.2 : 0.4
+                    shadowVerticalOffset: mainWindow.lightTheme ? 1 : 0
+                    shadowHorizontalOffset: mainWindow.lightTheme ? 1 : 0
+                    contrast: mainWindow.lightTheme ? 0.15 : 0.0
+                    brightness: mainWindow.lightTheme ? -0.05 : 0.0
                 }
             }
             Item {
-                width: 50;
-                height: 40;
+                width: 60;
+                height: width;
                 opacity: mainWindow.airbagWarning ? 1.0 : 0.0;
                 visible: opacity > 0;
                 Image {
+                    id: airbagLight
                     source: "control_lights/airbag_light.png";
                     anchors.centerIn: parent;
                     width: parent.width; height: width;
@@ -1871,9 +1918,14 @@ Window {
                 }
                 layer.enabled: true;
                 layer.effect: MultiEffect {
-                    shadowEnabled: true;
-                    shadowColor: "#ff0000";
-                    shadowBlur: 0.4
+                    source: airbagLight
+                    shadowEnabled: true
+                    shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.55) : "#ffaa00"
+                    shadowBlur: mainWindow.lightTheme ? 0.2 : 0.4
+                    shadowVerticalOffset: mainWindow.lightTheme ? 1 : 0
+                    shadowHorizontalOffset: mainWindow.lightTheme ? 1 : 0
+                    contrast: mainWindow.lightTheme ? 0.15 : 0.0
+                    brightness: mainWindow.lightTheme ? -0.05 : 0.0
                 }
             }
         }
