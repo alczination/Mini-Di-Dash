@@ -197,9 +197,9 @@ Window {
     Behavior on speed { SmoothedAnimation { velocity: 150; duration: 200 } }
     property string _testManualGear: "N"
     property bool manualGearOverride: false
-    property string currentGear: (testMode || manualGearOverride || typeof gearBackend === "undefined")
+    property string currentGear: (testMode || manualGearOverride || typeof gearReceiver === "undefined")
                                  ? _testManualGear
-                                 : gearBackend.currentGear
+                                 : gearReceiver.currentGear
     property real totalMileage: canBusBackend.mileage
     property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
@@ -1086,7 +1086,7 @@ Window {
             Text {
                 id: gearText
                 anchors.centerIn: parent
-                text: mainWindow.currentGear
+                text: gearReceiver.currentGear
                 font.family: miniFont.name
                 font.pixelSize: gearIndicator.width * 0.58
                 font.bold: true

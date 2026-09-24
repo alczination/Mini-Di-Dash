@@ -376,10 +376,8 @@ void CanWorker::parseFrame(const struct can_frame &frame)
             uint8_t byte1 = static_cast<uint8_t>(frame.data[1]);
             uint8_t byte3 = static_cast<uint8_t>(frame.data[3]);
             uint8_t byte4 = static_cast<uint8_t>(frame.data[4]);
-
             emit handbrakeReceived((byte4 & 0x02) != 0);
             emit hoodStatusReceived((byte1 & 0x08) != 0);
-
             double outdoor_temp = static_cast<double>(byte3 & 0x7F);
             if ((byte3 & 0x80) != 0) {
                 outdoor_temp = -outdoor_temp;
@@ -391,28 +389,44 @@ void CanWorker::parseFrame(const struct can_frame &frame)
 
     // Mileage & Display BC
     case 0x61A: {
-        if (frame.can_dlc >= 4) {
-            uint32_t b_msb = static_cast<uint8_t>(frame.data[2]);
+        if (frame.can_dlc >= 3) {
+            uint32_t b_lsb = static_cast<uint8_t>(frame.data[0]);
             uint32_t b_mid = static_cast<uint8_t>(frame.data[1]);
-            uint32_t b_lsb = static_cast<uint8_t>(frame.data[3]);
+            uint32_t b_msb = static_cast<uint8_t>(frame.data[2]);
 
-            int mileage = static_cast<int>((b_msb << 16) | (b_mid << 8) | b_lsb);
+            int raw_mileage = static_cast<int>((b_msb << 16) | (b_mid << 8) | b_lsb);
+            if (raw_mileage >= 1000000 || raw_mileage == 0x0FFFFF) {
+                break;
+            }
+            int min_expected = (m_savedMileageToDisk > 50000) ? (m_savedMileageToDisk - 5) : 50000;
+            if (raw_mileage < min_expected) {
+                break;
+            }
+            if (m_lastValidMileage == 0 || (raw_mileage >= m_lastValidMileage && raw_mileage <= m_lastValidMileage + 100)) {
+                m_lastValidMileage = raw_mileage;
+                emit mileageReceived(raw_mileage);
+                if (std::abs(raw_mileage - m_savedMileageToDisk) >= 1) {
+                    m_savedMileageToDisk = raw_mileage;
+                    QSettings settings("MiniDiDash", "MiniDiDash");
+                    settings.setValue("odometer/totalMileage", raw_mileage);
+                }
+            } else if (std::abs(raw_mileage - m_savedMileageToDisk) > 100) {
+                static int candidateMileage = 0;
+                static int candidateCount = 0;
+                if (candidateMileage == raw_mileage) {
+                    candidateCount++;
+                    if (candidateCount >= 3) { // 3 identyczne ramki z rzędu = prawda
+                        m_lastValidMileage = raw_mileage;
+                        m_savedMileageToDisk = raw_mileage;
+                        emit mileageReceived(raw_mileage);
 
-            if (mileage >= 50000 && mileage <= 999999) {
-                if (m_lastValidMileage > 0) {
-                    if (mileage >= (m_lastValidMileage - 1) && mileage <= (m_lastValidMileage + 50)) {
-                        m_lastValidMileage = mileage;
-                        emit mileageReceived(mileage);
-
-                        if (mileage - m_savedMileageToDisk >= 1) {
-                            m_savedMileageToDisk = mileage;
-                            QSettings settings("MiniDiDash", "MiniDiDash");
-                            settings.setValue("odometer/totalMileage", mileage);
-                        }
+                        QSettings settings("MiniDiDash", "MiniDiDash");
+                        settings.setValue("odometer/totalMileage", raw_mileage);
+                        candidateCount = 0;
                     }
                 } else {
-                    m_lastValidMileage = mileage;
-                    emit mileageReceived(mileage);
+                    candidateMileage = raw_mileage;
+                    candidateCount = 1;
                 }
             }
         }

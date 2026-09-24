@@ -9,7 +9,7 @@ project(MiniDashboard VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml SerialPort Quick QuickControls2 Network)
 
 qt_standard_project_setup()
 
@@ -64,6 +64,8 @@ qt_add_qml_module(appMiniDashboard
         SOURCES GearBackend.h
         SOURCES GearBackend.cpp
         SOURCES CanBusBackend.cpp
+        SOURCES GearSensorReceiver.h
+        SOURCES GearSensorReceiver.cpp
 )
 
 target_include_directories(appMiniDashboard PRIVATE
@@ -73,9 +75,11 @@ target_include_directories(appMiniDashboard PRIVATE
 
 target_link_libraries(appMiniDashboard
     PRIVATE
+        Qt6::Core
         Qt6::Quick
         Qt6::QuickControls2
         Qt6::Network
+        Qt6::SerialPort
 )
 
 if(UNIX AND NOT APPLE)
