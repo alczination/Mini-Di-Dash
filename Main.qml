@@ -20,6 +20,7 @@ Window {
         property alias themeMode: mainWindow.themeMode
         property alias activeColorOption: mainWindow.activeColorOption
         property alias activeLogoOption: mainWindow.activeLogoOption
+        property alias brightnessSetting: mainWindow.brightnessSetting
 
         property alias rpmType: nestedMenuContainer.rpmType
         property alias gaugeSweepActive: nestedMenuContainer.gaugeSweepActive
@@ -161,21 +162,29 @@ Window {
     }
     */
 
-    property real displayBrightness: 0.4
+    property string brightnessSetting: "100%"
+    readonly property real effectiveBrightness: {
+        switch (brightnessSetting) {
+        case "100%": return 1.0;
+        case "80%": return 0.80;
+        case "60%": return 0.60;
+        case "40%": return 0.40;
+        default: return 1.0;
+        }
+    }
 
-    // Nakładka przyciemniająca (Software Dimmer)
         Rectangle {
-            id: brightnessOverlay
+            id: screenDimmerOverlay
             anchors.fill: parent
             color: "black"
             z: 99999
             // 1.0 jasności = 0.0 krycia czerni; 0.6 jasności = 0.4 krycia czerni
-            opacity: Math.max(0.0, Math.min(1.0, 1.0 - mainWindow.displayBrightness))
+            opacity: Math.max(0.0, Math.min(1.0, 1.0 - mainWindow.effectiveBrightness))
             visible: opacity > 0.0
 
             // Płynne ściemnianie i rozjaśnianie
             Behavior on opacity {
-                NumberAnimation { duration: 400; easing.type: Easing.InOutQuad }
+                NumberAnimation { duration: 350; easing.type: Easing.InOutQuad }
             }
         }
 
@@ -1761,6 +1770,7 @@ Window {
                 fontName: miniFont.name
                 activeLogo: mainWindow.activeLogoOption
                 activeColor: mainWindow.activeColorOption
+                activeBrightness: mainWindow.brightnessSetting
 
                 // Nasłuchiwanie akcji z wnętrza menu
                 onThemeChanged: mainWindow.themeMode = (mainWindow.themeMode + 1) % 2
@@ -1780,7 +1790,11 @@ Window {
 
                 onLogoChanged: (newLogo) => {
                                    mainWindow.activeLogoOption = newLogo
-                               }
+                                }
+                onBrightnessChanged: (newVal) => {
+                                    mainWindow.brightnessSetting = newVal;
+                                }
+
                 onOilReset: {
                     mainWindow.resetOilService()
                     nestedMenuContainer.exitSubMenu()

@@ -26,6 +26,10 @@ ListView {
     readonly property var logoOptions: ["MINI", "COOPER S", "MODERN", "BRAK"]
     property int currentLogoIndex: logoOptions.indexOf(backend.currentLogo) !== -1 ? logoOptions.indexOf(backend.currentLogo) : 0
 
+    readonly property var brightnessOptions: ["100%", "80%", "60%", "40%"]
+    property string activeBrightness: "100%"
+    property int currentBrightnessIndex: brightnessOptions.indexOf(activeBrightness) !== -1 ? brightnessOptions.indexOf(activeBrightness) : 0
+
     property bool rpmType : true
     property bool gaugeSweepActive: true
     property bool parkingAssistant: false
@@ -67,6 +71,13 @@ ListView {
             currentColorIndex = idx;
         }
     }
+
+    onActiveBrightnessChanged: {
+        var idx = brightnessOptions.indexOf(activeBrightness);
+        if (idx !== -1) currentBrightnessIndex = idx;
+    }
+
+    signal brightnessChanged(string newBrightness)
 
     function moveUp() {
         currentIndex = (currentIndex - 1 < 0) ? maxItemsCount - 1 : currentIndex - 1;
@@ -126,7 +137,7 @@ ListView {
         ListElement { name: "GAUGE SWEEP"; category: "APP"; type: "toggle"; idNum: 6 }
         ListElement { name: "LOGO"; category: "APP"; type: "choice"; idNum: 7 }
         ListElement { name: "*ANIMACJA STARTOWA"; category: "choice"; type: "toggle"; idNum: 8 }
-        ListElement { name: "*JASNOŚĆ"; category: "APP"; type: "choice"; idNum: 9 }
+        ListElement { name: "JASNOŚĆ"; category: "APP"; type: "choice"; idNum: 9 }
         ListElement { name: "*TRYB DZIEŃ/NOC"; category: "APP"; type: "toggle"; idNum: 10 }
         // Dodatkowe systemy
         ListElement { name: "CZUJ. BIEG"; category: "ADD_SYSTEMS"; type: "toggle"; idNum: 15 }
@@ -179,6 +190,10 @@ ListView {
                     case 7:
                         currentLogoIndex = (currentLogoIndex + 1) % logoOptions.length;
                         logoChanged(logoOptions[currentLogoIndex]);
+                        break;
+                    case 9:
+                        currentBrightnessIndex = (currentBrightnessIndex + 1) % brightnessOptions.length;
+                        brightnessChanged(brightnessOptions[currentBrightnessIndex]);
                         break;
                     case 10: parkingAssistant = !parkingAssistant; break;
                     case 11: turboBoostSensorActive = !turboBoostSensorActive; break;
@@ -275,7 +290,7 @@ ListView {
                         if (model.idNum === 5) return "IGŁA"
                         if (model.idNum === 7) return settingsModeRoot.logoOptions[settingsModeRoot.currentLogoIndex]
                         if (model.idNum === 8) return "MINI"
-                        if (model.idNum === 9) return "AUTO"
+                        if (model.idNum === 9) return settingsModeRoot.brightnessOptions[settingsModeRoot.currentBrightnessIndex]
                         return "ZMIEŃ"
                     }
 
