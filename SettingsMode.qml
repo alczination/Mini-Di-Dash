@@ -164,6 +164,10 @@ ListView {
         ListElement { name: "*RESTART"; category: "SYSTEM"; type: "action"; idNum: 26 }
         ListElement { name: "*LOG CAN"; category: "SYSTEM"; type: "action"; idNum: 27 }
         ListElement { name: "*TEMP. CPU"; category: "SYSTEM"; type: "status"; idNum: 28 }
+        ListElement { name: "*RAM"; category: "SYSTEM"; type: "status"; idNum: 29 }
+        ListElement { name: "*CPU LOAD"; category: "SYSTEM"; type: "status"; idNum: 30 }
+        ListElement { name: "*UPTIME"; category: "SYSTEM"; type: "status"; idNum: 31 }
+        ListElement { name: "*THROTTLING"; category: "SYSTEM"; type: "status"; idNum: 32 }
     }
     ListModel { id: filteredOptionsModel }
 

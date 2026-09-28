@@ -162,6 +162,12 @@ Window {
     }
     */
 
+    onCenterModeChanged: {
+        if (centerMode !== 7) {
+            nestedMenuContainer.exitSubMenu();
+        }
+    }
+
     property string brightnessSetting: "100%"
     readonly property real effectiveBrightness: {
         switch (brightnessSetting) {
@@ -173,20 +179,19 @@ Window {
         }
     }
 
-        Rectangle {
-            id: screenDimmerOverlay
-            anchors.fill: parent
-            color: "black"
-            z: 99999
-            // 1.0 jasności = 0.0 krycia czerni; 0.6 jasności = 0.4 krycia czerni
-            opacity: Math.max(0.0, Math.min(1.0, 1.0 - mainWindow.effectiveBrightness))
-            visible: opacity > 0.0
+    Rectangle {
+        id: screenDimmerOverlay
+        anchors.fill: parent
+        color: "black"
+        z: 99999
+        opacity: Math.max(0.0, Math.min(1.0, 1.0 - mainWindow.effectiveBrightness))
+        visible: opacity > 0.0
 
-            // Płynne ściemnianie i rozjaśnianie
-            Behavior on opacity {
-                NumberAnimation { duration: 350; easing.type: Easing.InOutQuad }
-            }
+        // Płynne ściemnianie i rozjaśnianie
+        Behavior on opacity {
+            NumberAnimation { duration: 350; easing.type: Easing.InOutQuad }
         }
+    }
 
 
     // Themes
@@ -343,10 +348,12 @@ Window {
 
     property bool isZoomed: false
     onIsZoomedChanged: {
-        if (isZoomed) {
-            centerMode = 0
+            if (!isZoomed) {
+                nestedMenuContainer.exitSubMenu();
+            } else if (centerMode !== 7) {
+                centerMode = 0;
+            }
         }
-    }
 
     // Blinkers
     property bool headlightsActive: canBusBackend.headlightsActive
@@ -1790,10 +1797,10 @@ Window {
 
                 onLogoChanged: (newLogo) => {
                                    mainWindow.activeLogoOption = newLogo
-                                }
+                               }
                 onBrightnessChanged: (newVal) => {
-                                    mainWindow.brightnessSetting = newVal;
-                                }
+                                         mainWindow.brightnessSetting = newVal;
+                                     }
 
                 onOilReset: {
                     mainWindow.resetOilService()
