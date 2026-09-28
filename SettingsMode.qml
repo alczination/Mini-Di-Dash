@@ -19,14 +19,15 @@ ListView {
     property string fontName: "Michroma"
 
     property string currentTheme: lightTheme ? "JASNY" : "CIEMNY"
+    property string activeColor: "NIEBIESKI"
     readonly property var colorOptions: ["NIEBIESKI", "VOLCANO", "BIAŁY"]
-    property int currentColorIndex: 0
-    property bool rpmType : true
-    property bool gaugeSweepActive: true
+    property int currentColorIndex: colorOptions.indexOf(activeColor) !== -1 ? colorOptions.indexOf(activeColor) : 0
     property string activeLogo: "MINI"
     readonly property var logoOptions: ["MINI", "COOPER S", "MODERN", "BRAK"]
     property int currentLogoIndex: logoOptions.indexOf(backend.currentLogo) !== -1 ? logoOptions.indexOf(backend.currentLogo) : 0
 
+    property bool rpmType : true
+    property bool gaugeSweepActive: true
     property bool parkingAssistant: false
     property bool turboBoostSensorActive: true
     property bool oilPressureSensorActive: true
@@ -57,6 +58,13 @@ ListView {
         var idx = logoOptions.indexOf(activeLogo);
         if (idx !== -1) {
             currentLogoIndex = idx;
+        }
+    }
+
+    onActiveColorChanged: {
+        var idx = colorOptions.indexOf(activeColor);
+        if (idx !== -1) {
+            currentColorIndex = idx;
         }
     }
 
@@ -113,7 +121,7 @@ ListView {
         ListElement { name: "USUŃ"; category: "PROFILES"; type: "action"; idNum: 2 }
         // Wygląd
         ListElement { name: "MOTYW"; category: "APP"; type: "choice"; idNum: 3 }
-        ListElement { name: "*KOLOR POD."; category: "APP"; type: "choice"; idNum: 4 }
+        ListElement { name: "PODŚW."; category: "APP"; type: "choice"; idNum: 4 }
         ListElement { name: "WSK. OBROTÓW"; category: "APP"; type: "toggle"; idNum: 5 }
         ListElement { name: "GAUGE SWEEP"; category: "APP"; type: "toggle"; idNum: 6 }
         ListElement { name: "LOGO"; category: "APP"; type: "choice"; idNum: 7 }

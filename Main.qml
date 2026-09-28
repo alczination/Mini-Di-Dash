@@ -161,27 +161,41 @@ Window {
     }
     */
 
+    property real displayBrightness: 0.4
+
+    // Nakładka przyciemniająca (Software Dimmer)
+        Rectangle {
+            id: brightnessOverlay
+            anchors.fill: parent
+            color: "black"
+            z: 99999
+            // 1.0 jasności = 0.0 krycia czerni; 0.6 jasności = 0.4 krycia czerni
+            opacity: Math.max(0.0, Math.min(1.0, 1.0 - mainWindow.displayBrightness))
+            visible: opacity > 0.0
+
+            // Płynne ściemnianie i rozjaśnianie
+            Behavior on opacity {
+                NumberAnimation { duration: 400; easing.type: Easing.InOutQuad }
+            }
+        }
+
 
     // Themes
     property color electricBlue: "#00ccff"
     property color volcanoOrange: "#ef7911"
     property color redLineColor: "#ff2200"
+    property string activeColorOption: "NIEBIESKI"
+
     property color accentColor: {
-        if (lightTheme) {
-            return volcanoOrange;
+        switch (activeColorOption) {
+        case "NIEBIESKI": return "#00ccff";
+        case "VOLCANO": return "#ef7911";
+        case "BIAŁY": return "#ffffff";
+        default: return electricBlue;
         }
-        return (activeColorOption === "VOLCANO") ? volcanoOrange : electricBlue;
     }
 
-    property string activeColorOption: "VOLCANO"
-    property color customAccentColor: {
-        switch (activeColorOption) {
-        case "NIEBIESKI": return "#00ccff"
-        case "VOLCANO": return "#ef7911"
-        case "BIAŁY": return "#ffffff"
-        default: return lightTheme ? volcanoOrange : electricBlue
-        }
-    }
+    readonly property alias customAccentColor: mainWindow.accentColor
 
     property int themeMode: 0
     property bool lightTheme: themeMode === 1
@@ -835,10 +849,10 @@ Window {
                             if (isRedline) {
                                 return mainWindow.redLineColor;
                             }
-                            if (mainWindow.lightTheme) {
-                                return headlightsActive ? volcanoOrange : "#474747";
+                            if (!headlightsActive) {
+                                return "#474747";
                             }
-                            return headlightsActive ? "#ffffff" : "#474747";
+                            return mainWindow.customAccentColor;
                         }
                         visible: true
                         border.width: 1;
@@ -980,11 +994,7 @@ Window {
                                 return mainWindow.lightTheme ? "#1b1b1b" : "#4a4a4a";
                             }
                             else {
-                                if (mainWindow.lightTheme) {
-                                    return isReached ? "#d46200" : volcanoOrange;
-                                } else {
-                                    mainWindow.customAccentColor;
-                                }
+                                return mainWindow.customAccentColor;
                             }
                         }
 
@@ -1750,6 +1760,7 @@ Window {
                 electricBlue: mainWindow.electricBlue
                 fontName: miniFont.name
                 activeLogo: mainWindow.activeLogoOption
+                activeColor: mainWindow.activeColorOption
 
                 // Nasłuchiwanie akcji z wnętrza menu
                 onThemeChanged: mainWindow.themeMode = (mainWindow.themeMode + 1) % 2
