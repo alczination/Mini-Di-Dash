@@ -16,11 +16,20 @@ Item {
     property string electricBlue: "#00ccff"
     property string volcanoOrange: "#EF7911"
     property string fontName: "Michroma"
+    property color accentColor: "#00ccff"
 
-    readonly property color currentAccent: lightTheme ? volcanoOrange : electricBlue
-
-    Behavior on y { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
-    Behavior on height { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
+    Behavior on y {
+        NumberAnimation {
+            duration: 450;
+            easing.type: Easing.InOutQuad
+        }
+    }
+    Behavior on height {
+        NumberAnimation {
+            duration: 450;
+            easing.type: Easing.InOutQuad
+        }
+    }
 
     Rectangle {
         id: lcdFrame
@@ -33,10 +42,21 @@ Item {
             GradientStop { position: 1.0; color: "#1c140c" }
         }
 
-        border.color: lcdRoot.lightTheme ? "#ccc" : Qt.rgba(0, 0.8, 1, 0.3);
+        border.color: lcdRoot.lightTheme ? "#ccc" : Qt.rgba(lcdRoot.accentColor.r, lcdRoot.accentColor.g, lcdRoot.accentColor.b, 0.3);
         border.width: 2.0;
 
-        Behavior on radius { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
+        Behavior on radius {
+            NumberAnimation {
+                duration: 450;
+                easing.type: Easing.InOutQuad
+            }
+        }
+
+        Behavior on border.color {
+            ColorAnimation {
+                duration: 250
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -54,7 +74,12 @@ Item {
                     Rectangle {
                         width: lcdRoot.width
                         height: 1
-                        color: lcdRoot.lightTheme ? lcdRoot.volcanoOrange : lcdRoot.electricBlue
+                        color: lcdRoot.accentColor
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 250
+                            }
+                        }
                     }
                 }
             }
@@ -79,11 +104,16 @@ Item {
         layer.smooth: true
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: lcdRoot.volcanoOrange
+            shadowColor: lcdRoot.accentColor
             shadowBlur: 0.35
             shadowOpacity: 0.6
             shadowVerticalOffset: 0
             shadowHorizontalOffset: 0
+            Behavior on shadowColor {
+                ColorAnimation {
+                    duration: 250
+                }
+            }
         }
     }
 
@@ -98,11 +128,20 @@ Item {
             font.pixelSize: 22
             font.bold: true
             font.letterSpacing: 2
-            color: lcdRoot.lightTheme ? lcdRoot.volcanoOrange : lcdRoot.electricBlue
+            color: lcdRoot.accentColor
             opacity: lcdRoot.isZoomed ? 0.0 : 0.95
             visible: opacity > 0
 
-            Behavior on opacity { NumberAnimation { duration: 250 } }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 250
+                }
+            }
+            Behavior on color {
+                ColorAnimation {
+                    duration: 250
+                }
+            }
 
             text: {
                 switch (lcdRoot.infoMode) {
@@ -118,7 +157,7 @@ Item {
         Text {
             id: valueText
             anchors.horizontalCenter: parent.horizontalCenter
-            color: lcdRoot.lightTheme ? "#ffaa33" : "#f5f5f5"
+            color: "#f5f5f5"
             font.pixelSize: lcdRoot.isZoomed ? 21 : 24
             font.bold: true
             font.family: lcdRoot.fontName

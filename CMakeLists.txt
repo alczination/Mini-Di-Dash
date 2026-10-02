@@ -28,7 +28,8 @@ qt_add_qml_module(appMiniDashboard
     VERSION 1.0
     QML_FILES
         Main.qml
-        ClassicTheme.qml
+        StartupOverlay.qml
+        CenterDisplay.qml
         EngineMode.qml
         TripMode.qml
         TurboMode.qml
@@ -66,6 +67,8 @@ qt_add_qml_module(appMiniDashboard
         SOURCES CanBusBackend.cpp
         SOURCES GearSensorReceiver.h
         SOURCES GearSensorReceiver.cpp
+        QML_FILES StartupOverlay.qml
+        QML_FILES CenterDisplay.qml
 )
 
 target_include_directories(appMiniDashboard PRIVATE
