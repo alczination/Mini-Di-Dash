@@ -67,8 +67,6 @@ qt_add_qml_module(appMiniDashboard
         SOURCES CanBusBackend.cpp
         SOURCES GearSensorReceiver.h
         SOURCES GearSensorReceiver.cpp
-        QML_FILES StartupOverlay.qml
-        QML_FILES CenterDisplay.qml
 )
 
 target_include_directories(appMiniDashboard PRIVATE
