@@ -136,7 +136,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.horizontalCenterOffset: 0
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: mainWindow.isZoomed ? -145 : -135
+            anchors.verticalCenterOffset: mainWindow.isZoomed ? -145 : -140
             z: 25
             scale: mainWindow.isZoomed ? 1.2 : 1.4
             Behavior on anchors.verticalCenterOffset {
