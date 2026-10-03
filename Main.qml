@@ -39,11 +39,9 @@ Window {
         lightTheme: mainWindow.lightTheme
         logoSource: centerDisplay.miniLogoSource
         logoWidth: centerDisplay.miniLogoWidth
-
         onRevealStarted: {
             gaugeRevealAnimation.start()
         }
-
         onStartupFinished: {
             if (centerDisplay.gaugeSweepActive) {
                 sweepAnimation.start();
@@ -56,7 +54,6 @@ Window {
     SequentialAnimation {
         id: gaugeRevealAnimation
         running: false
-
         ParallelAnimation {
             NumberAnimation { target: centerDisplay; property: "opacity"; to: 1; duration: 800; easing.type: Easing.InOutQuad }
             NumberAnimation {
@@ -72,13 +69,11 @@ Window {
             NumberAnimation { target: elementsLayer; property: "opacity"; to: 1; duration: 900 }
             NumberAnimation { target: bottomLcdDisplay; property: "opacity"; to: 1; duration: 1000 }
         }
-
         SequentialAnimation {
             NumberAnimation { target: topOuterWarningLights; property: "opacity"; to: 1; duration: 150 }
             NumberAnimation { target: leftWarningLights; property: "opacity"; to: 1; duration: 150 }
             NumberAnimation { target: rightWarningLights; property: "opacity"; to: 1; duration: 150 }
         }
-
         NumberAnimation { target: rpmNeedleContainer; property: "opacity"; to: 1; duration: 300; easing.type: Easing.InOutQuad }
     }
 
@@ -123,40 +118,11 @@ Window {
 
     Connections {
         target: canBusBackend
-        //function onAbsWarningReceived(active) { if(!mainWindow.testMode) mainWindow._realAbsWarning = active }
-        // function onTractionWarningReceived(active) { if(!mainWindow.testMode) mainWindow._realTractionWarning = active }
-        // function onEngineMilStatusReceived(active) { if(!mainWindow.testMode) mainWindow._realCheckEngine = active }
-        /*
-        function onClusterLightsReceived(leftBlinker, rightBlinker, headlights, handbrake) {
-            if (!mainWindow.testMode) {
-                if (leftBlinker !== mainWindow.leftBlinkerActive || rightBlinker !== mainWindow.rightBlinkerActive) {
-                    mainWindow.blinkState = true
-                }
-                mainWindow.leftBlinkerActive = leftBlinker
-                mainWindow.rightBlinkerActive = rightBlinker
-                mainWindow.headlightsActive = headlights
-                mainWindow.handbrakeActive = handbrake
-            }
-        }
-        */
-        function onLeftBlinkerChanged() {
-            if (!mainWindow.testMode) {
-                mainWindow.leftBlinkerActive = canBusBackend.leftBlinker
-            }
-        }
-
-        function onRightBlinkerChanged() {
-            if (!mainWindow.testMode) {
-                mainWindow.rightBlinkerActive = canBusBackend.rightBlinker
-            }
-        }
-
         function onLightsStatusChanged() {
             if (!mainWindow.testMode) {
                 mainWindow.headlightsActive = canBusBackend.headlightsActive
             }
         }
-
         function onIsSleepingChanged() {
             if (!mainWindow.testMode) {
                 if (canBusBackend.isSleeping) {
@@ -185,31 +151,21 @@ Window {
     }
 
     property int centerMode: 0
-    readonly property var modeNames: ["OSIĄGI", "SILNIK", "TRIP", "TURBO", "INSPEKCJA", "PARK", "OPONY", "USTAWIENIA"]
-
-    /*
-    readonly property var allModesDefintion: [
-    { id: 0, name: "OSIĄGI" },
-    { id: 1, name: "SILNIK" },
-    { id: 2, name: "TRIP" },
-    { id: 3, name: "TURBO" },
-    { id: 4, name: "INSPEKCJA" },
-    { id: 5, name: "PARK", conditional: true },
-    { id: 6, name: "OPONY" },
-    { id: 7, name: "USTAWIENIA" }
+    readonly property var allModes: [
+        { idKey: "MAIN", name: "PRĘDKOŚĆ", enabled: true },
+        { idKey: "ENGINE", name: "OSIĄGI", enabled: true },
+        { idKey: "TRIP", name: "TRIP", enabled: true },
+        { idKey: "TURBO", name: "TURBO", enabled: centerDisplay.turboBoostSensorActive },
+        { idKey: "INSPECTION", name: "SERWIS", enabled: true },
+        { idKey: "PARK", name: "PARK", enabled: centerDisplay.parkingAssistant },
+        { idKey: "TIRES", name: "CIŚNIENIE", enabled: centerDisplay.tpmsSensorActive },
+        { idKey: "SETTINGS", name: "USTAWIENIA", enabled: true }
     ]
-
-    readonly property var availableModes: {
-        var list = []
-        for (var i = 0; i < allModesDefintion.length; i++) {
-            var m = allModesDefintion
-        }
-    }
-    */
-
-    onCenterModeChanged: {
-        if (centerMode !== 7) {
-            centerDisplay.exitSubMenu();
+    readonly property var activeModes: allModes.filter(m => m.enabled)
+    readonly property string currentModeKey: activeModes[mainWindow.centerMode] ? activeModes[mainWindow.centerMode].idKey : "MAIN"
+    onActiveModesChanged: {
+        if (centerMode >= activeModes.length) {
+            centerMode = Math.max(0, activeModes.length - 1)
         }
     }
 
@@ -231,20 +187,16 @@ Window {
         z: 99999
         opacity: Math.max(0.0, Math.min(1.0, 1.0 - mainWindow.effectiveBrightness))
         visible: opacity > 0.0
-
-        // Płynne ściemnianie i rozjaśnianie
         Behavior on opacity {
             NumberAnimation { duration: 350; easing.type: Easing.InOutQuad }
         }
     }
-
 
     // Themes
     property color electricBlue: "#00ccff"
     property color volcanoOrange: "#ef7911"
     property color redLineColor: "#ff2200"
     property string activeColorOption: "NIEBIESKI"
-
     property color accentColor: {
         switch (activeColorOption) {
         case "NIEBIESKI": return "#00ccff";
@@ -253,19 +205,9 @@ Window {
         default: return electricBlue;
         }
     }
-
     readonly property alias customAccentColor: mainWindow.accentColor
-
     property int themeMode: 0
     property bool lightTheme: themeMode === 1
-
-    // Main
-
-
-
-    // Test-params
-    // property real rpm: 3000
-
     property real rpm: testMode ? 0 : canBusBackend.rpm
     property real displayedRpm: testMode ? rpm : (startupSweepActive ? sweepRpm : (rpm === 0 ? 0 : smoothedRpm))
     property real speed: testMode ? 0 : canBusBackend.speed
@@ -279,19 +221,16 @@ Window {
     property real outdoorTemp: testMode ? 0 : canBusBackend.outdoorTemp
     property int infoMode: 0
     property bool fuelAlertShownThisTrip: false
-
     // Engine-Mode
     property double oilTemp: testMode ? 0 : canBusBackend.oilTemp
     property double oilPress: testMode ? 0 : canBusBackend.oilPress
     property double engineTemp: testMode ? 0 : canBusBackend.engineTemp
-
     // Trip-Mode
     property real fuelAmount: testMode ? 0 : canBusBackend.fuelAmount
     // property real fuelAmount: 5
     property real rangeKm: testMode ? 0 : canBusBackend.rangeKm
     property real fuelReserveThreshold: 5.0
     property real maxFuelCapacity: 50
-
     onFuelAmountChanged: {
         if (!mainWindow.testMode) {
             if (fuelAmount <= fuelReserveThreshold && !mainWindow.fuelAlertShownThisTrip) {
@@ -315,44 +254,35 @@ Window {
             }
         }
     }
-
     // Turbo-Mode
     property real throttlePosition: testMode ? 0 : canBusBackend.throttle
-
     // Service-Mode
     property int serviceOilKm: 15000
     property int serviceBrakesKm: 30000
     property var inspectionDate: new Date(2028, 5, 1)
-
     readonly property int daysToInspection: {
         var now = new Date()
         var diffTime = inspectionDate.getTime() - now.getTime()
         return Math.floor(diffTime / (1000 * 60 * 60 * 24))
     }
-
     readonly property int oilStatus: serviceOilKm < 0 ? 2 : (serviceOilKm <= 2000 ? 1 : 0)
     readonly property int brakesStatus: serviceBrakesKm < 0 ? 2 : (serviceBrakesKm <= 2000 ? 1 : 0)
     readonly property int inspectionStatus: daysToInspection < 0 ? 2 : (daysToInspection <= 30 ? 1 : 0)
-
     function getServiceColor(status) {
         if (status === 2) return mainWindow.redLineColor
         if (status === 1) return "#ffaa00"
         return mainWindow.lightTheme ? "#444444" : "#ffffff"
     }
-
     function resetInspectionDate() {
         var currentDate = new Date()
         inspectionDate = new Date(currentDate.getFullYear() + 2, currentDate.getMonth(), 1)
     }
-
     function resetOilService() {
         serviceOilKm = 15000
     }
-
     function resetBrakesService() {
         serviceBrakesKm = 30000
     }
-
     property int _lastTrackedMileage: totalMileage
     onTotalMileageChanged: {
         if (_lastTrackedMileage > 0 && totalMileage > _lastTrackedMileage) {
@@ -362,7 +292,6 @@ Window {
         }
         _lastTrackedMileage = totalMileage
     }
-
     function checkStartupServiceAlert() {
         if (oilStatus === 2) {
             triggerServiceAlert("WYMIEŃ OLEJ!", (serviceOilKm) + " KM", redlineColor)
@@ -378,7 +307,6 @@ Window {
             triggerServiceAlert("PRZEGLĄD", "ZA " + daysToInspection + " DNI", "#ffaa00")
         }
     }
-
     function triggerServiceAlert(msg, subMsg, alertCol) {
         mainWindow.wasZoomedBeforeAlert = mainWindow.isZoomed
         mainWindow.alertMessage = msg
@@ -389,36 +317,30 @@ Window {
         mainWindow.isZoomed = true
         alertTimeout.restart()
     }
-
     // Settings-Mode
     property string activeLogoOption: "MINI"
-
     property bool isZoomed: false
     onIsZoomedChanged: {
         if (!isZoomed) {
             centerDisplay.exitSubMenu();
-        } else if (centerMode !== 7) {
+        } else if (currentModeKey !== "SETTINGS") {
             centerMode = 0;
         }
     }
-
     // Blinkers
     property bool headlightsActive: canBusBackend.headlightsActive
     property bool leftBlinkerActive: canBusBackend.leftBlinker
     property bool rightBlinkerActive: canBusBackend.rightBlinker
     property bool blinkState: true
-
     // Doors and Hood
     property bool doorLeftOpen: canBusBackend.doorLeft
     property bool doorRightOpen: canBusBackend.doorRight
     property bool hoodOpen: canBusBackend.hoodOpen
     property bool trunkOpen: canBusBackend.trunkOpen
-
     // MISC
     property bool isBulbCheckActive: false
     property bool testMode: false
     property bool showFps: false
-
     // Check Controls
     property bool _realCheckEngine: canBusBackend.checkEngine
     property bool checkEngine: _realCheckEngine || isBulbCheckActive || testMode
@@ -429,7 +351,6 @@ Window {
     property bool _realAirbagWarning: false
     property bool airbagWarning: _realAirbagWarning || isBulbCheckActive || testMode
     property bool handbrakeActive: testMode ? _testHandbrake : canBusBackend.handbrake
-
     // Startup and Zoom
     property bool startupSweepActive: true
     property real sweepRpm: 0
@@ -439,7 +360,6 @@ Window {
     property int selectedSettingIndex: 0
     property bool useArcInsteadOfNeedle: !centerDisplay.rpmType
     property bool gearIndicatorActive: centerDisplay.gearIndicatorActive
-
     // Alerts
     property string alertStandby: "TRYB UŚPIENIA"
     property string alertFuel: "REZERWA"
@@ -453,14 +373,11 @@ Window {
     property string alertOilSensor: "AWARIA CZUJNIKA OLEJU"
     property string alertABS: "AWARIA ABS"
     property string alertCheckEngine: "CHECK ENGINE"
-
     property bool fuelAlertTriggered: false
     property bool standbyAlertTriggered: false
-
     property bool anyWarningActive: checkEngine || absWarning || tractionWarning || airbagWarning
     property bool isAlertActive: false
     property int _currentTestAlertIndex: 0
-
     property string alertMessage: ""
     property string alertSubMessage: ""
     property color alertColor: "#ffaa00"
@@ -495,7 +412,6 @@ Window {
                     doorRightOpen = true;
                     hoodOpen = true;
                     trunkOpen = true
-
                     sweepAnimation.stop()
                     mainWindow.startupSweepActive = false
                     mainWindow.sweepRpm = 0
@@ -508,7 +424,6 @@ Window {
                     doorRightOpen = false;
                     hoodOpen = false;
                     trunkOpen = false
-
                     rpmAnimation.stop()
                     speedAnimation.stop()
                     mainWindow.rpm = 0
@@ -620,11 +535,14 @@ Window {
             interval: 800
             repeat: false
             onTriggered: {
-                if (mainWindow.isZoomed && mainWindow.centerMode === 7) {
-                    centerDisplay.exitSubMenu()
-                } else {
-                    mainWindow.isZoomed = true
-                    mainWindow.centerMode = 7
+                var settingsIndex = mainWindow.activeModes.findIndex(m => m.idKey === "SETTINGS")
+                if (settingsIndex !== -1) {
+                    if (mainWindow.isZoomed && mainWindow.centerMode === settingsIndex) {
+                        centerDisplay.exitSubMenu()
+                    } else {
+                        mainWindow.isZoomed = true
+                        mainWindow.centerMode = settingsIndex
+                    }
                 }
             }
         }
@@ -666,7 +584,6 @@ Window {
                             if (event.key === Qt.Key_L) headlightsActive = !headlightsActive
 
                             if (event.key === Qt.Key_U) {
-
                                 var testAlerts = [
                                     { msg: alertStandby, sub: "SYSTEM ZOSTANIE\nWKRÓTCE UŚPIONY", icon: "control_lights/tank_light.png", color: "#ffaa00" },
                                     { msg: alertFuel, sub: "POZOSTAŁO 50 KM", icon: "control_lights/tank_light.png", color: "#ffaa00" },
@@ -704,8 +621,8 @@ Window {
                             }
 
                             if (isZoomed) {
-
-                                if (centerMode === 7) {
+                                var isSettings = (mainWindow.currentModeKey === "SETTINGS")
+                                if (isSettings) {
                                     if (event.key === Qt.Key_Up) {
                                         centerDisplay.moveUp();
                                         event.accepted = true;
@@ -722,28 +639,34 @@ Window {
                                         return;
                                     }
                                 }
-                                if (centerMode !== 7 || centerDisplay.currentSubMenu === "") {
-                                    if (event.key === Qt.Key_Left) {
-                                        centerMode = (centerMode - 1 < 0) ? 7 : centerMode - 1
-                                        mainWindow.selectedSettingIndex = 0
-                                        event.accepted = true;
-                                    }
-                                    if (event.key === Qt.Key_Right) {
-                                        centerMode = (centerMode + 1) % 8
-                                        mainWindow.selectedSettingIndex = 0
-                                        event.accepted = true;
+                                if (!isSettings || centerDisplay.currentSubMenu === "") {
+                                    var totalModes = mainWindow.activeModes.length
+                                    if (totalModes > 0) {
+                                        if (event.key === Qt.Key_Left) {
+                                            centerMode = (centerMode - 1 + totalModes) % totalModes
+                                            mainWindow.selectedSettingIndex = 0
+                                            event.accepted = true;
+                                        }
+                                        if (event.key === Qt.Key_Right) {
+                                            centerMode = (centerMode + 1) % totalModes
+                                            mainWindow.selectedSettingIndex = 0
+                                            event.accepted = true;
+                                        }
                                     }
                                 }
                             }
                         }
+
         Keys.onReleased: (event) => {
                              if (event.isAutoRepeat) {
                                  event.accepted = true
                                  return
                              }
 
-                             if (event.key === Qt.Key_J) {
+                             var totalModes = mainWindow.activeModes.length
+                             var isSettings = (mainWindow.currentModeKey === "SETTINGS")
 
+                             if (event.key === Qt.Key_J) {
                                  if (btn1LongPressTimer.running) {
                                      btn1LongPressTimer.stop()
 
@@ -752,10 +675,10 @@ Window {
                                          mainWindow.isZoomed = mainWindow.wasZoomedBeforeAlert
                                          alertTimeout.stop()
                                      } else if (mainWindow.isZoomed) {
-                                         if (mainWindow.centerMode === 7) {
+                                         if (isSettings) {
                                              centerDisplay.triggerAction()
-                                         } else {
-                                             mainWindow.centerMode = (mainWindow.centerMode + 1) % 8
+                                         } else if (totalModes > 0) {
+                                             mainWindow.centerMode = (mainWindow.centerMode + 1) % totalModes
                                              mainWindow.selectedSettingIndex = 0
                                          }
                                      } else {
@@ -770,10 +693,10 @@ Window {
                                      btn2LongPressTimer.stop()
 
                                      if (mainWindow.isZoomed) {
-                                         if (mainWindow.centerMode === 7) {
+                                         if (isSettings) {
                                              centerDisplay.moveDown()
-                                         } else {
-                                             mainWindow.centerMode = (mainWindow.centerMode - 1 < 0) ? 7 : (mainWindow.centerMode - 1)
+                                         } else if (totalModes > 0) {
+                                             mainWindow.centerMode = (mainWindow.centerMode - 1 + totalModes) % totalModes
                                              mainWindow.selectedSettingIndex = 0
                                          }
                                      } else {
@@ -905,11 +828,11 @@ Window {
             Repeater {
                 model: [6250, 6750]
                 Item {
-                    width: 720; height: 720; anchors.centerIn: parent
-
+                    width: 720
+                    height: 720
+                    anchors.centerIn: parent
                     property int currentRpm: modelData
                     property bool isRedline: currentRpm >= 6750
-
                     visible: currentRpm % 500 !== 0
                     rotation: -110 + (currentRpm * 0.0275)
                     z: 49
@@ -925,7 +848,7 @@ Window {
                             if (isRedline) {
                                 return mainWindow.redLineColor
                             }
-                            return headlightsActive ? "#ffffff" : "#474747";
+                            return headlightsActive ? mainWindow.accentColor : "#474747";
                         }
                     }
                 }
@@ -1042,7 +965,6 @@ Window {
                         scale: isReached ? 1.22 : 1.0
 
                         Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on styleColor { ColorAnimation { duration: 150 } }
                         Behavior on y { NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
                         Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
                     }
@@ -1083,8 +1005,6 @@ Window {
                                             mainWindow.redLineColor.b,
                                             0.45)
                 } else {
-                    // W motywie jasnym stosujemy volcanoOrange, w ciemnym electricBlue (czyli mainWindow.accentColor)
-                    // z dopasowanym poziomem przezroczystości (alpha)
                     ctx.fillStyle = Qt.rgba(mainWindow.accentColor.r,
                                             mainWindow.accentColor.g,
                                             mainWindow.accentColor.b,

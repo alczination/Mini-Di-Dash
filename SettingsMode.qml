@@ -6,18 +6,15 @@ ListView {
     height: 177
     anchors.centerIn: parent
     anchors.verticalCenterOffset: 20
-
     interactive: false
     focus: false
     Keys.enabled: false
-
     property string currentSubMenu: ""
     property int maxItemsCount: 6
     property bool lightTheme: false
     property color electricBlue: "#00ccff"
     property color volcanoOrange: "#ef7911"
     property string fontName: "Michroma"
-
     property string currentTheme: lightTheme ? "JASNY" : "CIEMNY"
     property string activeColor: "NIEBIESKI"
     readonly property var colorOptions: ["NIEBIESKI", "VOLCANO", "BIAŁY"]
@@ -25,11 +22,9 @@ ListView {
     property string activeLogo: "MINI"
     readonly property var logoOptions: ["MINI", "COOPER S", "MODERN", "BRAK"]
     property int currentLogoIndex: logoOptions.indexOf(backend.currentLogo) !== -1 ? logoOptions.indexOf(backend.currentLogo) : 0
-
     readonly property var brightnessOptions: ["100%", "80%", "60%", "40%"]
     property string activeBrightness: "100%"
     property int currentBrightnessIndex: brightnessOptions.indexOf(activeBrightness) !== -1 ? brightnessOptions.indexOf(activeBrightness) : 0
-
     property bool rpmType : true
     property bool gaugeSweepActive: true
     property bool parkingAssistant: false
@@ -38,18 +33,14 @@ ListView {
     property bool tpmsSensorActive: false
     property bool perfShiftActive: true
     property bool gearIndicatorActive: false
-
     property bool showFps: false
-
     signal themeChanged()
     signal colorChanged(string newColor)
     signal fpsToggled()
     signal logoChanged(string newLogo)
-
     signal turboCalibrated()
     signal tripReset()
     signal consumptionReset()
-
     signal oilReset()
     signal brakesReset()
     signal inspectionReset()
@@ -226,8 +217,8 @@ ListView {
         height: 55
         radius: 6
         property bool isSelected: index == settingsModeRoot.currentIndex
-        readonly property color activeAccentColor: settingsModeRoot.lightTheme ? volcanoOrange : electricBlue
-        readonly property color selectedBgColor: settingsModeRoot.lightTheme ? Qt.rgba(0.94, 0.47, 0.07, 0.18) : Qt.rgba(0, 0.8, 1, 0.18)
+        readonly property color activeAccentColor: mainWindow.customAccentColor
+        readonly property color selectedBgColor: Qt.rgba(activeAccentColor.r, activeAccentColor.g, activeAccentColor.b, settingsModeRoot.lightTheme ? 0.20 : 0.18)
         readonly property color idleBgColor: settingsModeRoot.lightTheme ? "#f0f2f5" : "#1f1f1f"
         color: isSelected ? selectedBgColor : idleBgColor
         border.width: isSelected ? 1.5 : (settingsModeRoot.lightTheme ? 1 : 0)
@@ -301,7 +292,27 @@ ListView {
                     if (model.type === "status") return "OK"
                     return ""
                 }
-                color: model.type === "toggle" ? settingsModeRoot.electricBlue : "#ffaa00"
+                color: {
+                    if (model.idNum === 4) {
+                        let currentColor = settingsModeRoot.colorOptions[settingsModeRoot.currentColorIndex]
+                        if (currentColor === "VOLCANO") return mainWindow.volcanoOrange
+                        if (currentColor === "NIEBIESKI") return mainWindow.electricBlue
+                        if (currentColor === "BIAŁY") {
+                            return settingsModeRoot.lightTheme ? "#333333": "#ffffff"
+                        }
+                    }
+                    if (model.type === "toggle") {
+                        return itemRow.activeAccentColor
+                    }
+                    return "#ffaa00"
+                    }
+                style: (model.idNum === 4 && settingsModeRoot.colorOptions[settingsModeRoot.currentColorIndex] === "BIAŁY") ? Text.Outline : Text.Normal
+                styleColor: settingsModeRoot.lightTheme ? "transparent" : "#222222"
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+                }
             }
         }
     }
