@@ -289,8 +289,17 @@ void SystemMonitor::onUpdateOutputReady() {
 
 void SystemMonitor::onUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     Q_UNUSED(exitStatus);
+    if (m_updateProcess) {
+        onUpdateOutputReady();
+    }
+    qDebug() << "[UPDATE FINISHED] exitCode:" << exitCode
+             << "m_alreadyUpToDate:" << m_alreadyUpToDate
+             << "m_updateFailed:" << m_updateFailed;
+
     if (exitCode == 0 && !m_updateFailed) {
         if (m_alreadyUpToDate) {
+            m_updateProgress = 0;
+            m_updateStep = "You have the latest update installed.";
             emit updateStateChanged();
             return;
         }
@@ -303,6 +312,7 @@ void SystemMonitor::onUpdateFinished(int exitCode, QProcess::ExitStatus exitStat
     } else {
         m_updateFailed = true;
         if (m_updateStep.isEmpty()) m_updateStep = "Error during update process";
+        emit updateStateChanged();
     }
 }
 
