@@ -271,17 +271,29 @@ void SystemMonitor::onUpdateOutputReady() {
         QString line = QString::fromUtf8(rawLine).trimmed();
         if (line.isEmpty()) continue;
         qDebug() << "[DASH-UPDATE]:" << line;
-        m_updateLog = line;
-        if (line.startsWith("[PROGRESS:")) {
-            QString val = line.section(':', 1, 1).remove(']');
-            m_updateProgress = val.toInt();
-        } else if (line.startsWith("[STEP:")) {
-            m_updateStep = line.section(':', 1).chopped(1);
-        } else if (line.startsWith("[ERROR:")) {
-            m_updateStep = line.section(':', 1).chopped(1);
+        if (line.contains("ALREADY_UP_TO_DATE")) {
+            m_alreadyUpToDate = true;
+            qDebug() << ">>> m_alreadyUpToDate SET TO TRUE <<<";
+        }
+        if (line.contains("[PROGRESS:")) {
+            int startIdx = line.indexOf("[PROGRESS:") + 10;
+            int endIdx = line.indexOf("]", startIdx);
+            if (endIdx != -1) {
+                m_updateProgress = line.mid(startIdx, endIdx - startIdx).toInt();
+            }
+        } else if (line.contains("[STEP:")) {
+            int startIdx = line.indexOf("[STEP:") + 6;
+            int endIdx = line.indexOf("]", startIdx);
+            if (endIdx != -1) {
+                m_updateStep = line.mid(startIdx, endIdx - startIdx);
+            }
+        } else if (line.contains("[ERROR:")) {
+            int startIdx = line.indexOf("[ERROR:") + 7;
+            int endIdx = line.indexOf("]", startIdx);
+            if (endIdx != -1) {
+                m_updateStep = line.mid(startIdx, endIdx - startIdx);
+            }
             m_updateFailed = true;
-        } else if (line.contains("fatal:") || line.contains("error:") || line.contains("CMake Error")){
-            m_updateLog = line;
         }
     }
     emit updateStateChanged();

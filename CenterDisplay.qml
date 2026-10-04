@@ -192,7 +192,6 @@ Item {
                     return mainWindow.customAccentColor
                 }
                 Behavior on styleColor { ColorAnimation { duration: 200 } }
-                Behavior on styleColor { ColorAnimation { duration: 200 } }
                 onTextChanged: {
                     gearPopAnim.restart()
                 }
