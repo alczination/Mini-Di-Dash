@@ -53,12 +53,7 @@ public:
     QString updateLog() const { return m_updateLog; }
     bool updateFailed() const { return m_updateFailed; }
     Q_INVOKABLE void runInteractiveUpdate();
-    Q_INVOKABLE void cancelOrDismissUpdate() {
-        m_updateActive = false;
-        m_updateFailed = false;
-        m_alreadyUpToDate = false;
-        emit updateStateChanged();
-    }
+    Q_INVOKABLE void cancelOrDismissUpdate();
 
 signals:
     void statsUpdated();

@@ -312,6 +312,7 @@ void SystemMonitor::cancelOrDismissUpdate() {
     }
     m_updateActive = false;
     m_updateFailed = false;
+    m_alreadyUpToDate = false;
     emit updateStateChanged();
 }
 
