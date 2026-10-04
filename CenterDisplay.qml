@@ -123,6 +123,7 @@ Item {
             }
         }
         Item {
+            // Test
             id: modernGearIndicator
             width: 110
             height: 80
