@@ -495,25 +495,25 @@ Item {
             }
         }
         Rectangle {
-            visible: updateAlertOverlay.isUpToDate || updateAlertOverlay.isFailed
+            visible: updateScreenOverlay.isUpToDate || updateScreenOverlay.isFailed
             width: 140
             height: 28
             radius: 4
-            color: updateAlertOverlay.isFailed ? mainWindow.redLineColor : mainWindow.customAccentColor
+            color: updateScreenOverlay.isFailed ? mainWindow.redLineColor : mainWindow.customAccentColor
             anchors.horizontalCenter: parent.horizontalCenter
 
             Text {
                 anchors.centerIn: parent
-                text: "POWRÓT [OK]"
+                text: "POWRÓT"
                 font.family: "Michroma"
-                font.pixelSize: 12
+                font.pixelSize: 16
                 font.bold: true
-                color: updateAlertOverlay.isFailed ? "#ffffff" : "#000000"
+                color: updateScreenOverlay.isFailed ? "#ffffff" : "#000000"
             }
 
             MouseArea {
                 anchors.fill: parent
-                onClicked: if (typeof sysMon !== "undefined") sysMon.cancelOrDismissUpdate()
+                onClicked: if (typeof SystemMonitor !== "NULL") SystemMonitor.cancelOrDismissUpdate()
             }
         }
     }
