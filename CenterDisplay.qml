@@ -132,13 +132,21 @@ Item {
             anchors.verticalCenterOffset: mainWindow.isZoomed ? -145 : -140
             z: 25
             scale: mainWindow.isZoomed ? 1.2 : 1.4
+            property bool startupReady: false
+            Timer {
+                interval: 4500
+                running: true
+                repeat: false
+                onTriggered: modernGearIndicator.startupReady = true
+            }
             Behavior on anchors.verticalCenterOffset {
                 NumberAnimation {
                     duration: 400
-                    easing.type: Easing.InOutQuad
+                    easing.type: Easing.OutCubic
                 }
             }
-            property bool shouldBeVisible: centerDisplayRoot.gearIndicatorActive
+            property bool shouldBeVisible: startupReady
+                                           && centerDisplayRoot.gearIndicatorActive
                                            && !mainWindow.isAlertActive
                                            && !centerDisplayRoot.isUpdateRunning
                                            && (!mainWindow.isZoomed || mainWindow.currentModeKey === "MAIN")
@@ -155,14 +163,6 @@ Item {
                 if (mainWindow.currentGear === "N") return "#888888"
                 return mainWindow.lightTheme ? "#1a1a1a" : mainWindow.customAccentColor
             }
-            MultiEffect {
-                anchors.fill: racingBg
-                source: racingBg
-                shadowEnabled: true
-                shadowColor: mainWindow.currentGear === "N" ? "transparent" : modernGearIndicator.gearColor
-                shadowBlur: 0.8
-                opacity: 0.8
-            }
             Text {
                 id: gearTextCurrent
                 anchors.centerIn: parent
@@ -171,7 +171,7 @@ Item {
                 anchors.horizontalCenterOffset: 10
                 text: mainWindow.currentGear
                 font.family: miniFont.name
-                font.pixelSize: 55
+                font.pixelSize: 52
                 font.bold: true
                 font.italic: false
                 color: {
@@ -517,258 +517,258 @@ Item {
         }
     }
 
-Column {
-    id: globalSpeedColumn;
-    anchors.centerIn: parent;
-    anchors.verticalCenterOffset: mainWindow.isZoomed ? ((mainWindow.centerMode !== 0 || mainWindow.isAlertActive || centerDisplayRoot.isUpdateRunning) ? -137 : -14) : 28
-    Behavior on anchors.verticalCenterOffset {
-        NumberAnimation {
-            duration: 450;
-            easing.type: Easing.InOutQuad
-        }
-    }
-    spacing: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? -22 : -7) : 3
-    Text {
-        id: speedValueText
-        text: Math.floor(mainWindow.speed);
-        color: mainWindow.lightTheme ? volcanoOrange : "white";
-        font.family: miniFont.name;
-        font.bold: true;
-        anchors.horizontalCenter: parent.horizontalCenter;
-        font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 150 : 72) : 140;
-        topPadding: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 30 : -30) : -10;
-        antialiasing: true
-        smooth: true
-        renderType: Text.QtRendering
-        layer.enabled: true
-        layer.samples: 8
-        layer.smooth: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
-            shadowBlur: 0.35
-            shadowHorizontalOffset: 2
-            shadowVerticalOffset: 4
-            shadowOpacity: 1.0
-        }
-        Behavior on font.pixelSize {
+    Column {
+        id: globalSpeedColumn;
+        anchors.centerIn: parent;
+        anchors.verticalCenterOffset: mainWindow.isZoomed ? ((mainWindow.centerMode !== 0 || mainWindow.isAlertActive || centerDisplayRoot.isUpdateRunning) ? -137 : -14) : 28
+        Behavior on anchors.verticalCenterOffset {
             NumberAnimation {
-                duration: 450
-            }
-        }
-        Behavior on topPadding {
-            NumberAnimation {
-                duration: 450
+                duration: 450;
                 easing.type: Easing.InOutQuad
             }
         }
-    }
-    Text {
-        text: "KM/H";
-        color: mainWindow.lightTheme ? volcanoOrange : mainWindow.customAccentColor;
-        font.bold: true;
-        anchors.horizontalCenter: parent.horizontalCenter;
-        font.family: "Michroma"
-        font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 32 : 17) : 30;
-        visible: mainWindow.isZoomed ? 0.0 : 1.0;
-        transform: Translate {
-            y: mainWindow.isZoomed ? -230 : 0
-            Behavior on y {
-                NumberAnimation { duration: 450; easing.type: Easing.InOutQuad }
+        spacing: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? -22 : -7) : 3
+        Text {
+            id: speedValueText
+            text: Math.floor(mainWindow.speed);
+            color: mainWindow.lightTheme ? volcanoOrange : "white";
+            font.family: miniFont.name;
+            font.bold: true;
+            anchors.horizontalCenter: parent.horizontalCenter;
+            font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 150 : 72) : 140;
+            topPadding: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 30 : -30) : -10;
+            antialiasing: true
+            smooth: true
+            renderType: Text.QtRendering
+            layer.enabled: true
+            layer.samples: 8
+            layer.smooth: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
+                shadowBlur: 0.35
+                shadowHorizontalOffset: 2
+                shadowVerticalOffset: 4
+                shadowOpacity: 1.0
             }
-        }
-        Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
-        Behavior on opacity { NumberAnimation { duration: 300 } }
-    }
-    Text {
-        text: (mainWindow.startupSweepActive ? 0 : Math.floor(mainWindow.displayedRpm)) + " RPM";
-        color: mainWindow.accentColor;
-        font.family: miniFont.name;
-        font.bold: true;
-        anchors.horizontalCenter: parent.horizontalCenter;
-        font.pixelSize: 30;
-        opacity: (mainWindow.isZoomed && mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 1 : 0;
-        visible: opacity > 0;
-        antialiasing: true
-        smooth: true
-        renderType: Text.QtRendering
-        layer.enabled: true
-        layer.samples: 8
-        layer.smooth: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
-            shadowBlur: 0.25
-            shadowHorizontalOffset: 1
-            shadowVerticalOffset: 2
-            shadowOpacity: 1.0
-        }
-        Behavior on opacity { NumberAnimation { duration: 300 } } }
-}
-// Modes
-EngineMode {
-    id: engineModeScreen
-    oilPressureSensorActive: nestedMenuContainer.oilPressureSensorActive
-    oilTemp: canBusBackend.oilTemp
-    oilPress: canBusBackend.oilPress
-    engineTemp: canBusBackend.engineTemp
-    lightTheme: mainWindow.lightTheme
-    accentColor: mainWindow.accentColor
-    redLineColor: mainWindow.redLineColor
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "ENGINE" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-    spacing: 15
-}
-TripMode {
-    fuelAmount: mainWindow.fuelAmount
-    maxFuelCapacity: mainWindow.maxFuelCapacity
-    fuelReserveThreshold: mainWindow.fuelReserveThreshold
-    rangeKm: mainWindow.rangeKm
-    lightTheme: mainWindow.lightTheme
-    accentColor: mainWindow.accentColor
-    redLineColor: mainWindow.redLineColor
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TRIP" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-}
-TurboMode {
-    id: turboModeScreen
-    turboBoostSensorActive: nestedMenuContainer.turboBoostSensorActive
-    turboBoost: canBusBackend.hasOwnProperty("turboBoost") ? canBusBackend.turboBoost : 0.0
-    throttlePosition: mainWindow.throttlePosition
-    intakeTemp: 0.0
-    lightTheme: mainWindow.lightTheme
-    accentColor: mainWindow.accentColor
-    redLineColor: mainWindow.redLineColor
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TURBO" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-}
-ParkMode {
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "PARK" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-}
-InspectionMode {
-    lightTheme: mainWindow.lightTheme
-    serviceOilKm: mainWindow.serviceOilKm
-    serviceBrakesKm: mainWindow.serviceBrakesKm
-    inspectionDate: mainWindow.inspectionDate
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "INSPECTION" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-    spacing: 25
-}
-TiresMode {
-    id: tiresModeScreen
-    tpmsSensorActive: nestedMenuContainer.tpmsSensorActive
-    pressFL: canBusBackend.hasOwnProperty("pressFL") ? canBusBackend.pressFL : 0
-    pressFR: canBusBackend.hasOwnProperty("pressFR") ? canBusBackend.pressFR : 0
-    pressRL: canBusBackend.hasOwnProperty("pressRL") ? canBusBackend.pressRL : 0
-    pressRR: canBusBackend.hasOwnProperty("pressRR") ? canBusBackend.pressRR : 0
-    speedFL: canBusBackend.hasOwnProperty("speedFL") ? canBusBackend.speedFL : 0
-    speedFR: canBusBackend.hasOwnProperty("speedFR") ? canBusBackend.speedFR : 0
-    speedRL: canBusBackend.hasOwnProperty("speedRL") ? canBusBackend.speedRL : 0
-    speedRR: canBusBackend.hasOwnProperty("speedRR") ? canBusBackend.speedRR : 0
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TIRES" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-}
-SettingsMode {
-    id: nestedMenuContainer
-    lightTheme: mainWindow.lightTheme
-    electricBlue: mainWindow.electricBlue
-    fontName: miniFont.name
-    activeLogo: mainWindow.activeLogoOption
-    activeColor: mainWindow.activeColorOption
-    activeBrightness: mainWindow.brightnessSetting
-    onThemeChanged: mainWindow.themeMode = (mainWindow.themeMode + 1) % 2
-    onFpsToggled: mainWindow.showFps = !mainWindow.showFps
-    onTurboCalibrated: if (mainWindow.hasOwnProperty("turboBoost")) mainWindow.turboBoost = 0.0
-    onTripReset: {
-        if (mainWindow.hasOwnProperty("rangeKm")) mainWindow.rangeKm = 0
-        nestedMenuContainer.exitSubMenu()
-    }
-    onConsumptionReset: {
-        canBusBackend.resetTripConsumption()
-        nestedMenuContainer.exitSubMenu()
-    }
-    onColorChanged: (newColor) => {
-                        mainWindow.activeColorOption = newColor
-                    }
-    onLogoChanged: (newLogo) => {
-                       mainWindow.activeLogoOption = newLogo
-                   }
-    onBrightnessChanged: (newVal) => {
-                             mainWindow.brightnessSetting = newVal
-                         }
-    onOilReset: {
-        mainWindow.resetOilService()
-        nestedMenuContainer.exitSubMenu()
-    }
-    onBrakesReset: {
-        mainWindow.resetBrakesService()
-        nestedMenuContainer.exitSubMenu()
-    }
-    onInspectionReset: {
-        mainWindow.resetInspectionDate()
-        nestedMenuContainer.exitSubMenu()
-    }
-    opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "SETTINGS" && mainWindow.isZoomed) ? 1 : 0
-    visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: 400 } }
-}
-Column {
-    anchors.bottom: parent.bottom
-    anchors.bottomMargin: 36
-    anchors.horizontalCenter: parent.horizontalCenter
-    spacing: 8
-    z: 35
-    visible: mainWindow.isZoomed && !mainWindow.isAlertActive
-    Text {
-        id: modeNameText
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: (mainWindow?.activeModes && mainWindow.activeModes[mainWindow.centerMode]) ? mainWindow.activeModes[mainWindow.centerMode].name : ""
-        color: mainWindow.lightTheme ? "#222222" : "#dddddd"
-        font.family: miniFont.name
-        font.pixelSize: 16
-        font.letterSpacing: 2
-        font.bold: true
-        style: Text.Outline
-        styleColor: mainWindow.lightTheme ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(0, 0, 0, 0.8)
-        onTextChanged: modeFadeAnim.restart()
-        SequentialAnimation {
-            id: modeFadeAnim
-            NumberAnimation { target: modeNameText; property: "opacity"; from: 0.2; to: 1.0; duration: 150 }
-        }
-    }
-    Row {
-        anchors.horizontalCenter: parent.horizontalCenter
-        spacing: 6
-        visible: mainWindow.isZoomed && !mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning
-        Repeater {
-            model: mainWindow?.activeModes ? mainWindow.activeModes.length : 0
-            Rectangle {
-                required property int index
-                readonly property bool isCurrent: index === mainWindow.centerMode
-                width: isCurrent ? 14 : 5
-                height: 5
-                radius: 2.5
-                color: isCurrent ? mainWindow.customAccentColor : (mainWindow.lightTheme ? "#bbbbbb" : "#333333")
-                Behavior on width {
-                    NumberAnimation {
-                        duration: 250
-                        easing.type: Easing.OutQuad
-                    }
+            Behavior on font.pixelSize {
+                NumberAnimation {
+                    duration: 450
                 }
-                Behavior on color {
-                    ColorAnimation {
-                        duration: 200
-                    }
+            }
+            Behavior on topPadding {
+                NumberAnimation {
+                    duration: 450
+                    easing.type: Easing.InOutQuad
                 }
             }
         }
+        Text {
+            text: "KM/H";
+            color: mainWindow.lightTheme ? volcanoOrange : mainWindow.customAccentColor;
+            font.bold: true;
+            anchors.horizontalCenter: parent.horizontalCenter;
+            font.family: "Michroma"
+            font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 32 : 17) : 30;
+            visible: mainWindow.isZoomed ? 0.0 : 1.0;
+            transform: Translate {
+                y: mainWindow.isZoomed ? -230 : 0
+                Behavior on y {
+                    NumberAnimation { duration: 450; easing.type: Easing.InOutQuad }
+                }
+            }
+            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+        }
+        Text {
+            text: (mainWindow.startupSweepActive ? 0 : Math.floor(mainWindow.displayedRpm)) + " RPM";
+            color: mainWindow.accentColor;
+            font.family: miniFont.name;
+            font.bold: true;
+            anchors.horizontalCenter: parent.horizontalCenter;
+            font.pixelSize: 30;
+            opacity: (mainWindow.isZoomed && mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 1 : 0;
+            visible: opacity > 0;
+            antialiasing: true
+            smooth: true
+            renderType: Text.QtRendering
+            layer.enabled: true
+            layer.samples: 8
+            layer.smooth: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
+                shadowBlur: 0.25
+                shadowHorizontalOffset: 1
+                shadowVerticalOffset: 2
+                shadowOpacity: 1.0
+            }
+            Behavior on opacity { NumberAnimation { duration: 300 } } }
     }
-}
+    // Modes
+    EngineMode {
+        id: engineModeScreen
+        oilPressureSensorActive: nestedMenuContainer.oilPressureSensorActive
+        oilTemp: canBusBackend.oilTemp
+        oilPress: canBusBackend.oilPress
+        engineTemp: canBusBackend.engineTemp
+        lightTheme: mainWindow.lightTheme
+        accentColor: mainWindow.accentColor
+        redLineColor: mainWindow.redLineColor
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "ENGINE" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+        spacing: 15
+    }
+    TripMode {
+        fuelAmount: mainWindow.fuelAmount
+        maxFuelCapacity: mainWindow.maxFuelCapacity
+        fuelReserveThreshold: mainWindow.fuelReserveThreshold
+        rangeKm: mainWindow.rangeKm
+        lightTheme: mainWindow.lightTheme
+        accentColor: mainWindow.accentColor
+        redLineColor: mainWindow.redLineColor
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TRIP" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+    }
+    TurboMode {
+        id: turboModeScreen
+        turboBoostSensorActive: nestedMenuContainer.turboBoostSensorActive
+        turboBoost: canBusBackend.hasOwnProperty("turboBoost") ? canBusBackend.turboBoost : 0.0
+        throttlePosition: mainWindow.throttlePosition
+        intakeTemp: 0.0
+        lightTheme: mainWindow.lightTheme
+        accentColor: mainWindow.accentColor
+        redLineColor: mainWindow.redLineColor
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TURBO" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+    }
+    ParkMode {
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "PARK" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+    }
+    InspectionMode {
+        lightTheme: mainWindow.lightTheme
+        serviceOilKm: mainWindow.serviceOilKm
+        serviceBrakesKm: mainWindow.serviceBrakesKm
+        inspectionDate: mainWindow.inspectionDate
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "INSPECTION" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+        spacing: 25
+    }
+    TiresMode {
+        id: tiresModeScreen
+        tpmsSensorActive: nestedMenuContainer.tpmsSensorActive
+        pressFL: canBusBackend.hasOwnProperty("pressFL") ? canBusBackend.pressFL : 0
+        pressFR: canBusBackend.hasOwnProperty("pressFR") ? canBusBackend.pressFR : 0
+        pressRL: canBusBackend.hasOwnProperty("pressRL") ? canBusBackend.pressRL : 0
+        pressRR: canBusBackend.hasOwnProperty("pressRR") ? canBusBackend.pressRR : 0
+        speedFL: canBusBackend.hasOwnProperty("speedFL") ? canBusBackend.speedFL : 0
+        speedFR: canBusBackend.hasOwnProperty("speedFR") ? canBusBackend.speedFR : 0
+        speedRL: canBusBackend.hasOwnProperty("speedRL") ? canBusBackend.speedRL : 0
+        speedRR: canBusBackend.hasOwnProperty("speedRR") ? canBusBackend.speedRR : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TIRES" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+    }
+    SettingsMode {
+        id: nestedMenuContainer
+        lightTheme: mainWindow.lightTheme
+        electricBlue: mainWindow.electricBlue
+        fontName: miniFont.name
+        activeLogo: mainWindow.activeLogoOption
+        activeColor: mainWindow.activeColorOption
+        activeBrightness: mainWindow.brightnessSetting
+        onThemeChanged: mainWindow.themeMode = (mainWindow.themeMode + 1) % 2
+        onFpsToggled: mainWindow.showFps = !mainWindow.showFps
+        onTurboCalibrated: if (mainWindow.hasOwnProperty("turboBoost")) mainWindow.turboBoost = 0.0
+        onTripReset: {
+            if (mainWindow.hasOwnProperty("rangeKm")) mainWindow.rangeKm = 0
+            nestedMenuContainer.exitSubMenu()
+        }
+        onConsumptionReset: {
+            canBusBackend.resetTripConsumption()
+            nestedMenuContainer.exitSubMenu()
+        }
+        onColorChanged: (newColor) => {
+                            mainWindow.activeColorOption = newColor
+                        }
+        onLogoChanged: (newLogo) => {
+                           mainWindow.activeLogoOption = newLogo
+                       }
+        onBrightnessChanged: (newVal) => {
+                                 mainWindow.brightnessSetting = newVal
+                             }
+        onOilReset: {
+            mainWindow.resetOilService()
+            nestedMenuContainer.exitSubMenu()
+        }
+        onBrakesReset: {
+            mainWindow.resetBrakesService()
+            nestedMenuContainer.exitSubMenu()
+        }
+        onInspectionReset: {
+            mainWindow.resetInspectionDate()
+            nestedMenuContainer.exitSubMenu()
+        }
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "SETTINGS" && mainWindow.isZoomed) ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 400 } }
+    }
+    Column {
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 36
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 8
+        z: 35
+        visible: mainWindow.isZoomed && !mainWindow.isAlertActive
+        Text {
+            id: modeNameText
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: (mainWindow?.activeModes && mainWindow.activeModes[mainWindow.centerMode]) ? mainWindow.activeModes[mainWindow.centerMode].name : ""
+            color: mainWindow.lightTheme ? "#222222" : "#dddddd"
+            font.family: miniFont.name
+            font.pixelSize: 16
+            font.letterSpacing: 2
+            font.bold: true
+            style: Text.Outline
+            styleColor: mainWindow.lightTheme ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(0, 0, 0, 0.8)
+            onTextChanged: modeFadeAnim.restart()
+            SequentialAnimation {
+                id: modeFadeAnim
+                NumberAnimation { target: modeNameText; property: "opacity"; from: 0.2; to: 1.0; duration: 150 }
+            }
+        }
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 6
+            visible: mainWindow.isZoomed && !mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning
+            Repeater {
+                model: mainWindow?.activeModes ? mainWindow.activeModes.length : 0
+                Rectangle {
+                    required property int index
+                    readonly property bool isCurrent: index === mainWindow.centerMode
+                    width: isCurrent ? 14 : 5
+                    height: 5
+                    radius: 2.5
+                    color: isCurrent ? mainWindow.customAccentColor : (mainWindow.lightTheme ? "#bbbbbb" : "#333333")
+                    Behavior on width {
+                        NumberAnimation {
+                            duration: 250
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 200
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
