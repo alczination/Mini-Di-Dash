@@ -246,7 +246,7 @@ void SystemMonitor::runInteractiveUpdate() {
     emit updateStateChanged();
     if (!m_updateProcess) {
         m_updateProcess = new QProcess(this);
-        connect(m_updateProcess, &QProcess::readyStandardOutput, this, &SystemMonitor::onUpdateOutputReady);
+        connect(m_updateProcess, &QProcess::readyReadStandardOutput, this, &SystemMonitor::onUpdateOutputReady);
         connect(m_updateProcess, &QProcess::readyReadStandardError, this, &SystemMonitor::onUpdateOutputReady);
         connect(m_updateProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 this, &SystemMonitor::onUpdateFinished);
