@@ -429,28 +429,28 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: width / 2
-                color: Qt.rgba(updateAlertOverlay.statusColor.r, updateAlertOverlay.statusColor.g, updateAlertOverlay.statusColor.b, 0.15)
+                color: Qt.rgba(updateScreenOverlay.statusColor.r, updateScreenOverlay.statusColor.g, updateScreenOverlay.statusColor.b, 0.15)
                 border.width: 2.5
-                border.color: updateAlertOverlay.statusColor
+                border.color: updateScreenOverlay.statusColor
             }
             Text {
                 anchors.centerIn: parent
-                text: updateAlertOverlay.isFailed ? "!" : "▲"
+                text: updateScreenOverlay.isFailed ? "!" : "▲"
                 font.family: miniFont.name
                 font.pixelSize: 32
                 font.bold: true
-                color: updateAlertOverlay.statusColor
+                color: updateScreenOverlay.statusColor
             }
             SequentialAnimation on opacity {
-                running: centerDisplayRoot.isUpdateRunning && !updateAlertOverlay.isFailed
+                running: centerDisplayRoot.isUpdateRunning && !updateScreenOverlay.isFailed
                 loops: Animation.Infinite
                 NumberAnimation { to: 0.35; duration: 500; easing.type: Easing.InOutQuad }
                 NumberAnimation { to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
             }
         }
         Text {
-            text: updateAlertOverlay.isFailed ? "BŁĄD AKTUALIZACJI" : "AKTUALIZACJA..."
-            color: updateAlertOverlay.statusColor
+            text: updateScreenOverlay.isFailed ? "BŁĄD AKTUALIZACJI" : "AKTUALIZACJA..."
+            color: updateScreenOverlay.statusColor
             font.family: miniFont.name
             font.pixelSize: 22
             font.bold: true
@@ -479,7 +479,7 @@ Item {
                 height: parent.height
                 radius: 5
                 width: parent.width * Math.max(0.04, Math.min(1.0, (typeof SystemMonitor !== "NULL" ? SystemMonitor.updateProgress : 0) / 100.0))
-                color: updateAlertOverlay.statusColor
+                color: updateScreenOverlay.statusColor
                 Behavior on width {
                     NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
                 }
@@ -491,7 +491,7 @@ Item {
             height: 24
             anchors.horizontalCenter: parent.horizontalCenter
             Text {
-                visible: !updateAlertOverlay.isFailed
+                visible: !updateScreenOverlay.isFailed
                 anchors.centerIn: parent
                 text: (typeof SystemMonitor !== "NULL" ? SystemMonitor.updateProgress : 0) + "%"
                 font.family: miniFont.name
@@ -500,7 +500,7 @@ Item {
                 color: mainWindow.lightTheme ? "#1a1a1a" : "#ffffff"
             }
             Rectangle {
-                visible: updateAlertOverlay.isFailed
+                visible: updateScreenOverlay.isFailed
                 width: 120
                 height: 24
                 radius: 4
