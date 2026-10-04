@@ -3,6 +3,7 @@
 #include <QTextStream>
 #include <QNetworkInterface>
 #include <QProcess>
+#include <qdebug.h>
 #ifdef Q_OS_LINUX
 #include <unistd.h>
 #include <sys/reboot.h>
@@ -246,10 +247,17 @@ void SystemMonitor::runInteractiveUpdate() {
     emit updateStateChanged();
     if (!m_updateProcess) {
         m_updateProcess = new QProcess(this);
+        m_updateProcess->setProcessChannelMode(QProcess::MergedChannels);
         connect(m_updateProcess, &QProcess::readyReadStandardOutput, this, &SystemMonitor::onUpdateOutputReady);
         connect(m_updateProcess, &QProcess::readyReadStandardError, this, &SystemMonitor::onUpdateOutputReady);
         connect(m_updateProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 this, &SystemMonitor::onUpdateFinished);
+        connect(m_updateProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+            qCritical() << "[UPDATE CRITICAL ERROR]:" << error << m_updateProcess->errorString();
+            m_updateFailed = true;
+            m_updateStep = "Błąd procesu: " + m_updateProcess->errorString();
+            emit updateStateChanged();
+        });
     }
     m_updateProcess->start("/usr/local/bin/dash-update-worker.sh");
 #endif
@@ -257,9 +265,12 @@ void SystemMonitor::runInteractiveUpdate() {
 
 void SystemMonitor::onUpdateOutputReady() {
     if (!m_updateProcess) return;
-    while (m_updateProcess->canReadLine()) {
-        QString line = QString::fromUtf8(m_updateProcess->readLine()).trimmed();
+    QByteArray data = m_updateProcess->readAll();
+    QByteArrayList lines = data.split('\n');
+    for (const QByteArray &rawLine : lines) {
+        QString line = QString::fromUtf8(rawLine).trimmed();
         if (line.isEmpty()) continue;
+        qDebug() << "[DASH-UPDATE]:" << line;
         m_updateLog = line;
         if (line.startsWith("[PROGRESS:")) {
             QString val = line.section(':', 1, 1).remove(']');
@@ -269,9 +280,11 @@ void SystemMonitor::onUpdateOutputReady() {
         } else if (line.startsWith("[ERROR:")) {
             m_updateStep = line.section(':', 1).chopped(1);
             m_updateFailed = true;
+        } else if (line.contains("fatal:") || line.contains("error:") || line.contains("CMake Error")){
+            m_updateLog = line;
         }
-        emit updateStateChanged();
     }
+    emit updateStateChanged();
 }
 
 void SystemMonitor::onUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus) {
