@@ -6,7 +6,6 @@ Item {
     id: centerDisplayRoot
     width: 490
     height: 490
-
     property alias miniLogoSource: miniLogo.source
     property alias miniLogoWidth: miniLogo.width
     property alias rpmType: nestedMenuContainer.rpmType
@@ -31,16 +30,14 @@ Item {
     property real spanRad: notchSpanAngle * Math.PI / 180
     property real bottomRad: bottomSpanAngle * Math.PI / 180
     property real r: width / 2
-
     Behavior on scale { NumberAnimation { duration: 500; easing.type: Easing.OutQuad } }
-
+    readonly property bool isUpdateRunning: typeof SystemMonitor !== "NULL" && SystemMonitor.updateActive
     Item {
         id: hardwareRotatedShape
         anchors.fill: parent
         property color currentBorderColor: (mainWindow.displayedRpm >= 6750 && !mainWindow.startupSweepActive)
                                            ? mainWindow.redLineColor
                                            : mainWindow.customAccentColor
-
         Item {
             anchors.fill: parent
             Rectangle {
@@ -56,7 +53,6 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 100 } }
                 Behavior on anchors.margins { NumberAnimation { duration: 100 } }
             }
-
             Rectangle {
                 id: mainCircleBody
                 anchors.fill: parent
@@ -69,7 +65,6 @@ Item {
                     GradientStop { position: 0.7; color: mainWindow.lightTheme ? "#e2e6ea" : "#0d0d0d" }
                     GradientStop { position: 1.0; color: mainWindow.lightTheme ? "#cfd4da" : "#050505" }
                 }
-
                 Rectangle {
                     width: parent.width
                     height: parent.height
@@ -85,7 +80,6 @@ Item {
                 Behavior on border.color { ColorAnimation { duration: 120 } }
             }
         }
-
         Image {
             id: miniLogo
             function resolveLogoSource(option, isGearActive, isLight, isStartup) {
@@ -116,7 +110,7 @@ Item {
             fillMode: Image.PreserveAspectFit
             antialiasing: true
             readonly property bool allowedWithGear: mainWindow.activeLogoOption === "MINI" || mainWindow.activeLogoOption === "MODERN"
-            readonly property bool shouldBeVisible: source !== "" && !mainWindow.isZoomed && (mainWindow.startupSweepActive || !centerDisplayRoot.gearIndicatorActive || allowedWithGear)
+            readonly property bool shouldBeVisible: source !== "" && !mainWindow.isZoomed && !centerDisplayRoot.isUpdateRunning && (mainWindow.startupSweepActive || !centerDisplayRoot.gearIndicatorActive || allowedWithGear)
             opacity: shouldBeVisible ? 1.0 : 0.0
             visible: opacity > 0
             anchors.horizontalCenter: parent.horizontalCenter
@@ -128,7 +122,6 @@ Item {
                 }
             }
         }
-
         Item {
             id: modernGearIndicator
             width: 110
@@ -145,7 +138,10 @@ Item {
                     easing.type: Easing.InOutQuad
                 }
             }
-            property bool shouldBeVisible: centerDisplayRoot.gearIndicatorActive && !mainWindow.isAlertActive && (!mainWindow.isZoomed || mainWindow.centerMode === 0)
+            property bool shouldBeVisible: centerDisplayRoot.gearIndicatorActive
+                                           && !mainWindow.isAlertActive
+                                           && !centerDisplayRoot.isUpdateRunning
+                                           && (!mainWindow.isZoomed || mainWindow.currentModeKey === "MAIN")
             opacity: shouldBeVisible ? 1.0 : 0.0
             visible: opacity > 0
             Behavior on opacity {
@@ -159,7 +155,6 @@ Item {
                 if (mainWindow.currentGear === "N") return "#888888"
                 return mainWindow.lightTheme ? "#1a1a1a" : mainWindow.customAccentColor
             }
-
             MultiEffect {
                 anchors.fill: racingBg
                 source: racingBg
@@ -168,7 +163,6 @@ Item {
                 shadowBlur: 0.8
                 opacity: 0.8
             }
-
             Text {
                 id: gearTextCurrent
                 anchors.centerIn: parent
@@ -196,14 +190,11 @@ Item {
                     }
                     return mainWindow.customAccentColor
                 }
-
                 Behavior on styleColor { ColorAnimation { duration: 200 } }
                 Behavior on styleColor { ColorAnimation { duration: 200 } }
-
                 onTextChanged: {
                     gearPopAnim.restart()
                 }
-
                 SequentialAnimation {
                     id: gearPopAnim
                     ParallelAnimation {
@@ -235,30 +226,13 @@ Item {
             }
         }
     }
-
     // Fuel Arc
     Shape {
         anchors.fill: parent
         antialiasing: true
         smooth: true
         preferredRendererType: Shape.CurveRenderer
-
-        /*
-        // Biały znacznik
-        ShapePath {
-            strokeWidth: 6
-            strokeColor: mainWindow.lightTheme ? "#000000" : "#ffffff"
-            startX: centerDisplay.r + (centerDisplay.r) * Math.cos(90 * Math.PI / 180)
-            startY: centerDisplay.r + (centerDisplay.r - 12.5) * Math.sin(90 * Math.PI / 180)
-
-            PathLine {
-                x: centerDisplay.r + (centerDisplay.r) * Math.cos(90 * Math.PI / 180)
-                y: centerDisplay.r + (centerDisplay.r + 2.5) * Math.sin(90 * Math.PI / 180)
-            }
-        }
-        */
-
-        // Ciemne tło łuku
+        // Dark-Background
         ShapePath {
             fillColor: "transparent"
             strokeColor: mainWindow.lightTheme ? "#e0e0e0" : "#111111"
@@ -275,32 +249,26 @@ Item {
             }
         }
     }
-
     // Fuel Arc
     Shape {
         anchors.fill: parent
         antialiasing: true
         smooth: true
         preferredRendererType: Shape.CurveRenderer
-
         layer.enabled: true
         layer.smooth: true
         layer.samples: 8
-
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowBlur: 1.5
             shadowColor: mainWindow.fuelAmount < 4 ? mainWindow.redLineColor : "#ffaa00"
         }
-
         ShapePath {
             fillColor: "transparent"
             strokeColor: mainWindow.fuelAmount < 4 ? mainWindow.redLineColor : '#ffaa00'
             strokeWidth: 8
             capStyle: ShapePath.RoundCap
-
             Behavior on strokeColor { ColorAnimation { duration: 300 } }
-
             PathAngleArc {
                 centerX: centerDisplay.r
                 centerY: centerDisplay.r
@@ -308,14 +276,12 @@ Item {
                 radiusY: centerDisplay.r - 4
                 startAngle: 130
                 sweepAngle: -80 * Math.max(0.001, Math.min(1.0, mainWindow.fuelAmount / mainWindow.maxFuelCapacity))
-
                 Behavior on sweepAngle {
                     SmoothedAnimation { velocity: 60; duration: 250 }
                 }
             }
         }
     }
-
     Text {
         text: "0";
         color: mainWindow.fuelAmount <= mainWindow.fuelReserveThreshold ? mainWindow.redLineColor : (mainWindow.lightTheme ? "#888" : "#aaa")
@@ -325,7 +291,6 @@ Item {
         x: centerDisplay.r - 35 + (centerDisplay.r) * Math.cos(120 * Math.PI / 180) - width/2
         y: isZoomed ? centerDisplay.r - 30 + (centerDisplay.r - 25) * Math.sin(120 * Math.PI / 180) - height/2 : centerDisplay.r - 45 + (centerDisplay.r - 25) * Math.sin(120 * Math.PI / 180) - height/2
     }
-
     Item {
         width: 45;
         height: 45;
@@ -355,7 +320,6 @@ Item {
         x: centerDisplay.r + 35 + (centerDisplay.r - 15) * Math.cos(60 * Math.PI / 180) - width/2;
         y: isZoomed ? centerDisplay.r - 30 + (centerDisplay.r - 25) * Math.sin(60 * Math.PI / 180) - height/2 : centerDisplay.r - 45 + (centerDisplay.r - 25) * Math.sin(60 * Math.PI / 180) - height/2
     }
-
     Item {
         id: leftBlinkerItem;
         width: 40;
@@ -384,33 +348,28 @@ Item {
             }
         }
     }
-
     Item {
         id: rightBlinkerItem; width: 40; height: 30; anchors.top: parent.top; anchors.topMargin: mainWindow.isZoomed ? 120 : 60; anchors.horizontalCenter: parent.horizontalCenter; anchors.horizontalCenterOffset: mainWindow.isZoomed ? 140 : 80; z: 15
         opacity: (mainWindow.rightBlinkerActive && mainWindow.blinkState) ? 1.0 : 0.0; visible: opacity > 0
         Shape { anchors.fill: parent; ShapePath { fillColor: "#00ff00"; strokeColor: "transparent"; startX: 0; startY: 10; PathLine { x: 22; y: 10 } PathLine { x: 22; y: 0 } PathLine { x: 40; y: 15 } PathLine { x: 22; y: 30 } PathLine { x: 22; y: 20 } PathLine { x: 0; y: 20 } PathLine { x: 0; y: 10 } } }
     }
-
     Column {
         id: alertOverlay;
         anchors.centerIn: parent;
         anchors.verticalCenterOffset: 25;
         spacing: 15;
-        opacity: mainWindow.isAlertActive ? 1 : 0;
+        opacity: (mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning) ? 1 : 0;
         visible: opacity > 0;
         z: 100
-
         Behavior on opacity {
             NumberAnimation {
                 duration: 400
             }
         }
-
         Item {
             width: 86;
             height: 86;
             anchors.horizontalCenter: parent.horizontalCenter
-
             Image {
                 id: alertIconImg;
                 source: mainWindow.alertIconSource;
@@ -418,7 +377,6 @@ Item {
                 fillMode: Image.PreserveAspectFit;
                 visible: false
             }
-
             MultiEffect {
                 anchors.fill: alertIconImg;
                 source: alertIconImg;
@@ -429,7 +387,6 @@ Item {
                 shadowBlur: 1.0;
                 brightness: 0.8
             }
-
             SequentialAnimation on opacity {
                 running: mainWindow.isAlertActive;
                 loops: Animation.Infinite;
@@ -444,15 +401,130 @@ Item {
                 }
             }
         }
-
         Text { text: mainWindow.alertMessage; color: mainWindow.alertColor === mainWindow.redLineColor ? mainWindow.redLineColor : (mainWindow.lightTheme ? "black" : "white"); font.family: "Michroma"; font.pixelSize: 35; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; Behavior on color { ColorAnimation { duration: 250 } } }
         Text { text: mainWindow.alertSubMessage; color: mainWindow.alertColor; font.family: "Michroma"; font.pixelSize: 22; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter; opacity: 0.8 }
     }
 
     Column {
+        id: updateScreenOverlay
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: 15
+        spacing: 12
+        width: 340
+        opacity: centerDisplayRoot.isUpdateRunning ? 1 : 0
+        visible: opacity > 0
+        z: 101
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 300
+            }
+        }
+        readonly property bool isFailed: typeof SystemMonitor !== "NULL" && SystemMonitor.updateFailed
+        readonly property color statusColor: isFailed ? mainWindow.redLineColor : mainWindow.customAccentColor
+        Item {
+            width: 70
+            height: 70
+            anchors.horizontalCenter: parent.horizontalCenter
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: Qt.rgba(updateAlertOverlay.statusColor.r, updateAlertOverlay.statusColor.g, updateAlertOverlay.statusColor.b, 0.15)
+                border.width: 2.5
+                border.color: updateAlertOverlay.statusColor
+            }
+            Text {
+                anchors.centerIn: parent
+                text: updateAlertOverlay.isFailed ? "!" : "▲"
+                font.family: miniFont.name
+                font.pixelSize: 32
+                font.bold: true
+                color: updateAlertOverlay.statusColor
+            }
+            SequentialAnimation on opacity {
+                running: centerDisplayRoot.isUpdateRunning && !updateAlertOverlay.isFailed
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.35; duration: 500; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+            }
+        }
+        Text {
+            text: updateAlertOverlay.isFailed ? "BŁĄD AKTUALIZACJI" : "AKTUALIZACJA..."
+            color: updateAlertOverlay.statusColor
+            font.family: miniFont.name
+            font.pixelSize: 22
+            font.bold: true
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Text {
+            width: parent.width - 20
+            text: typeof SystemMonitor !== "NULL" ? SystemMonitor.updateStep : "Inicjalizacja..."
+            color: mainWindow.lightTheme ? "#333333" : "#cccccc"
+            font.family: miniFont.name
+            font.pixelSize: 13
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Rectangle {
+            width: parent.width - 30
+            height: 10
+            radius: 5
+            color: mainWindow.lightTheme ? "#d8dce2" : "#1a1f26"
+            border.color: mainWindow.lightTheme ? "#b0b6bf" : "#2c3440"
+            border.width: 1
+            anchors.horizontalCenter: parent.horizontalCenter
+            Rectangle {
+                height: parent.height
+                radius: 5
+                width: parent.width * Math.max(0.04, Math.min(1.0, (typeof SystemMonitor !== "NULL" ? SystemMonitor.updateProgress : 0) / 100.0))
+                color: updateAlertOverlay.statusColor
+                Behavior on width {
+                    NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
+                }
+            }
+        }
+
+        Item {
+            width: parent.width - 30
+            height: 24
+            anchors.horizontalCenter: parent.horizontalCenter
+            Text {
+                visible: !updateAlertOverlay.isFailed
+                anchors.centerIn: parent
+                text: (typeof SystemMonitor !== "NULL" ? SystemMonitor.updateProgress : 0) + "%"
+                font.family: miniFont.name
+                font.pixelSize: 13
+                font.bold: true
+                color: mainWindow.lightTheme ? "#1a1a1a" : "#ffffff"
+            }
+            Rectangle {
+                visible: updateAlertOverlay.isFailed
+                width: 120
+                height: 24
+                radius: 4
+                color: mainWindow.redLineColor
+                anchors.centerIn: parent
+                Text {
+                    anchors.centerIn: parent
+                    text: "ZAMKNIJ [OK]"
+                    font.family: miniFont.name
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: "#ffffff"
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: if (typeof SystemMonitor !== "NULL") SystemMonitor.cancelOrDismissUpdate()
+                }
+            }
+        }
+    }
+
+    Column {
         id: globalSpeedColumn;
         anchors.centerIn: parent;
-        anchors.verticalCenterOffset: mainWindow.isZoomed ? ((mainWindow.centerMode !== 0 || mainWindow.isAlertActive) ? -137 : -14) : 28
+        anchors.verticalCenterOffset: mainWindow.isZoomed ? ((mainWindow.centerMode !== 0 || mainWindow.isAlertActive || centerDisplayRoot.isUpdateRunning) ? -137 : -14) : 28
         Behavior on anchors.verticalCenterOffset {
             NumberAnimation {
                 duration: 450;
@@ -460,7 +532,6 @@ Item {
             }
         }
         spacing: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? -22 : -7) : 3
-
         Text {
             id: speedValueText
             text: Math.floor(mainWindow.speed);
@@ -470,14 +541,12 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter;
             font.pixelSize: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 150 : 72) : 140;
             topPadding: mainWindow.isZoomed ? ((mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 30 : -30) : -10;
-
             antialiasing: true
             smooth: true
             renderType: Text.QtRendering
             layer.enabled: true
             layer.samples: 8
             layer.smooth: true
-
             layer.effect: MultiEffect {
                 shadowEnabled: true
                 shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
@@ -486,13 +555,11 @@ Item {
                 shadowVerticalOffset: 4
                 shadowOpacity: 1.0
             }
-
             Behavior on font.pixelSize {
                 NumberAnimation {
                     duration: 450
                 }
             }
-
             Behavior on topPadding {
                 NumberAnimation {
                     duration: 450
@@ -510,7 +577,6 @@ Item {
             visible: mainWindow.isZoomed ? 0.0 : 1.0;
             transform: Translate {
                 y: mainWindow.isZoomed ? -230 : 0
-
                 Behavior on y {
                     NumberAnimation { duration: 450; easing.type: Easing.InOutQuad }
                 }
@@ -527,14 +593,12 @@ Item {
             font.pixelSize: 30;
             opacity: (mainWindow.isZoomed && mainWindow.centerMode === 0 && !mainWindow.isAlertActive) ? 1 : 0;
             visible: opacity > 0;
-
             antialiasing: true
             smooth: true
             renderType: Text.QtRendering
             layer.enabled: true
             layer.samples: 8
             layer.smooth: true
-
             layer.effect: MultiEffect {
                 shadowEnabled: true
                 shadowColor: mainWindow.lightTheme ? Qt.rgba(0, 0, 0, 0.75) : Qt.rgba(0, 0, 0, 0.95)
@@ -543,10 +607,8 @@ Item {
                 shadowVerticalOffset: 2
                 shadowOpacity: 1.0
             }
-
             Behavior on opacity { NumberAnimation { duration: 300 } } }
     }
-
     // Modes
     EngineMode {
         id: engineModeScreen
@@ -557,12 +619,11 @@ Item {
         lightTheme: mainWindow.lightTheme
         accentColor: mainWindow.accentColor
         redLineColor: mainWindow.redLineColor
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "ENGINE" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "ENGINE" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
         spacing: 15
     }
-
     TripMode {
         fuelAmount: mainWindow.fuelAmount
         maxFuelCapacity: mainWindow.maxFuelCapacity
@@ -571,11 +632,10 @@ Item {
         lightTheme: mainWindow.lightTheme
         accentColor: mainWindow.accentColor
         redLineColor: mainWindow.redLineColor
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "TRIP" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TRIP" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
     }
-
     TurboMode {
         id: turboModeScreen
         turboBoostSensorActive: nestedMenuContainer.turboBoostSensorActive
@@ -585,28 +645,25 @@ Item {
         lightTheme: mainWindow.lightTheme
         accentColor: mainWindow.accentColor
         redLineColor: mainWindow.redLineColor
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "TURBO" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TURBO" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
     }
-
     ParkMode {
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "PARK" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "PARK" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
     }
-
     InspectionMode {
         lightTheme: mainWindow.lightTheme
         serviceOilKm: mainWindow.serviceOilKm
         serviceBrakesKm: mainWindow.serviceBrakesKm
         inspectionDate: mainWindow.inspectionDate
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "INSPECTION" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "INSPECTION" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
         spacing: 25
     }
-
     TiresMode {
         id: tiresModeScreen
         tpmsSensorActive: nestedMenuContainer.tpmsSensorActive
@@ -618,11 +675,10 @@ Item {
         speedFR: canBusBackend.hasOwnProperty("speedFR") ? canBusBackend.speedFR : 0
         speedRL: canBusBackend.hasOwnProperty("speedRL") ? canBusBackend.speedRL : 0
         speedRR: canBusBackend.hasOwnProperty("speedRR") ? canBusBackend.speedRR : 0
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "TIRES" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "TIRES" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
     }
-
     SettingsMode {
         id: nestedMenuContainer
         lightTheme: mainWindow.lightTheme
@@ -663,7 +719,7 @@ Item {
             mainWindow.resetInspectionDate()
             nestedMenuContainer.exitSubMenu()
         }
-        opacity: (!mainWindow.isAlertActive && mainWindow.currentModeKey === "SETTINGS" && mainWindow.isZoomed) ? 1 : 0
+        opacity: (!mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning && mainWindow.currentModeKey === "SETTINGS" && mainWindow.isZoomed) ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 400 } }
     }
@@ -694,6 +750,7 @@ Item {
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: 6
+            visible: mainWindow.isZoomed && !mainWindow.isAlertActive && !centerDisplayRoot.isUpdateRunning
             Repeater {
                 model: mainWindow?.activeModes ? mainWindow.activeModes.length : 0
                 Rectangle {

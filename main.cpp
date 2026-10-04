@@ -2,7 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QQmlContext>
-
+#include "SystemMonitor.h"
 #include "CanBusBackend.h"
 #include "UltrasonicBackend.h"
 #include "GearBackend.h"
@@ -18,10 +18,12 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
+    SystemMonitor SystemMonitor;
     CanBusBackend canBackend;
     UltrasonicBackend ultrasonicBackend;
     GearBackend gearBackend;
     GearSensorReceiver gearReceiver;
+    engine.rootContext()->setContextProperty("SystemMonitor", &SystemMonitor);
     engine.rootContext()->setContextProperty("canBusBackend", &canBackend);
     engine.rootContext()->setContextProperty("ultrasonicBackend", &ultrasonicBackend);
     engine.rootContext()->setContextProperty("gearBackend", &gearBackend);

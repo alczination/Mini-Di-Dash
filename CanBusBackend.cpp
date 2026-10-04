@@ -518,10 +518,8 @@ CanBusBackend::CanBusBackend(QObject *parent)
     connect(m_worker, &CanWorker::engineMilStatusReceived, this, &CanBusBackend::setCheckEngine);
     connect(this, &CanBusBackend::requestResetTrip, m_worker, &CanWorker::resetTripConsumption);
     connect(m_worker, &CanWorker::wheelSpeedsReceived, this, &CanBusBackend::wheelSpeedsReceived);
-
     // Połączenie ramki kontrolek 0x61F ze slotem deski
     connect(m_worker, &CanWorker::clusterLightsReceived, this, &CanBusBackend::updateClusterLights);
-
     m_workerThread.start();
 }
 
