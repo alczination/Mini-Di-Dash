@@ -20,6 +20,7 @@ class SystemMonitor : public QObject {
     Q_PROPERTY(QString powerDraw READ powerDraw NOTIFY statsUpdated)
     Q_PROPERTY(bool vncActive READ vncActive NOTIFY statsUpdated)
     Q_PROPERTY(bool updateActive READ updateActive NOTIFY updateStateChanged)
+    Q_PROPERTY(bool alreadyUpToDate READ alreadyUpToDate NOTIFY updateStateChanged)
     Q_PROPERTY(int updateProgress READ updateProgress NOTIFY updateStateChanged)
     Q_PROPERTY(QString updateStep READ updateStep NOTIFY updateStateChanged)
     Q_PROPERTY(QString updateLog READ updateLog NOTIFY updateStateChanged)
@@ -46,12 +47,18 @@ public:
     Q_INVOKABLE void restartDashService();
     Q_INVOKABLE void toggleVnc();
     bool updateActive() const { return m_updateActive; }
+    bool alreadyUpToDate() const { return m_alreadyUpToDate; }
     int updateProgress() const { return m_updateProgress; }
     QString updateStep() const { return m_updateStep; }
     QString updateLog() const { return m_updateLog; }
     bool updateFailed() const { return m_updateFailed; }
     Q_INVOKABLE void runInteractiveUpdate();
-    Q_INVOKABLE void cancelOrDismissUpdate();
+    Q_INVOKABLE void cancelOrDismissUpdate() {
+        m_updateActive = false;
+        m_updateFailed = false;
+        m_alreadyUpToDate = false;
+        emit updateStateChanged();
+    }
 
 signals:
     void statsUpdated();
@@ -92,6 +99,7 @@ private:
     void readPowerDraw();
     QProcess *m_updateProcess{nullptr};
     bool m_updateActive{false};
+    bool m_alreadyUpToDate{false};
     int m_updateProgress{0};
     QString m_updateStep{""};
     QString m_updateLog{""};

@@ -170,7 +170,7 @@ ListView {
 
     function triggerAction() {
         if (typeof SystemMonitor !== "NULL" && SystemMonitor.updateActive) {
-            if (SystemMonitor.updateFailed) {
+            if (SystemMonitor.updateFailed || SystemMonitor.alreadyUpToDate) {
                 SystemMonitor.cancelOrDismissUpdate();
             }
             return;

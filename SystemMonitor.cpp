@@ -290,6 +290,10 @@ void SystemMonitor::onUpdateOutputReady() {
 void SystemMonitor::onUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     Q_UNUSED(exitStatus);
     if (exitCode == 0 && !m_updateFailed) {
+        if (m_alreadyUpToDate) {
+            emit updateStateChanged();
+            return;
+        }
         m_updateProgress = 100;
         m_updateStep = "Success! Restarting Dash...";
         emit updateStateChanged();
